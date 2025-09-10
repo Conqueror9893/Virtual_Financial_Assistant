@@ -1,0 +1,14 @@
+[
+  {
+    "nickname": "mom",
+    "name": "Mrs. Fatima Shah",
+    "account_number": "1234567890",
+    "ifsc": "HDFC0001234"
+  },
+  {
+    "nickname": "dad",
+    "name": "Mr. Ahmed Shah",
+    "account_number": "0987654321",
+    "ifsc": "ICIC0004321"
+  }
+]
