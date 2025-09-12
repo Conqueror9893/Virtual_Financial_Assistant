@@ -6,13 +6,26 @@ logger = get_logger("TransferTool")
 
 BENEFICIARIES_PATH = "data/beneficiaries.json"
 OTP_STORE = {}
-
+logger.info("Current working directory: %s", os.getcwd())
 
 def load_beneficiaries():
     if not os.path.exists(BENEFICIARIES_PATH):
+        logger.warning("Beneficiaries file not found at %s", BENEFICIARIES_PATH)
         return []
-    with open(BENEFICIARIES_PATH, "r") as f:
-        return json.load(f)
+    logger.info("Beneficiaries file found. Attempting to load...")
+    try:
+        with open(BENEFICIARIES_PATH, "r") as f:
+            data = json.load(f)
+            logger.info("Successfully loaded beneficiaries data with %d records", len(data) if isinstance(data, list) else 1)
+            return data
+    except json.JSONDecodeError as e:
+        logger.error("Error decoding JSON from %s: %s", BENEFICIARIES_PATH, str(e))
+        return []
+    except Exception as e:
+        logger.error("Unexpected error loading beneficiaries from %s: %s", BENEFICIARIES_PATH, str(e))
+        return []
+    
+        
 
 
 def resolve_beneficiary(nickname: str):

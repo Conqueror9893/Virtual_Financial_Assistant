@@ -40,7 +40,7 @@ def search_faq(query: str):
     """
     Use Ollama to find the most relevant FAQ.
     """
-    from ..ollama_runner import run_llm
+    from utils.llm_connector import run_llm
     if not FAQS:
         return {"question": None, "answer": "No FAQs available."}
 
