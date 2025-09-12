@@ -1,3 +1,4 @@
+# tools/spend_insights.py
 import pandas as pd
 from datetime import datetime
 from functools import lru_cache

@@ -1,13 +1,13 @@
-# langgraph_flow.py
+# langraph_flow/langgraph_flow.py
 from langgraph.graph import StateGraph, END
 from langchain.schema import HumanMessage, AIMessage
 from typing import TypedDict, Literal, Optional, Dict
 import json
 # Import your usecase handlers
-from nodes.spend_insights_node import handle_spend_insight
-from nodes.faq_node import handle_faq
-from nodes.offers_node import handle_offers
-from nodes.transfer_node import handle_transfer
+from .nodes.spend_insights_node import handle_spend_insight
+from .nodes.faq_node import handle_faq
+from .nodes.offers_node import handle_offers
+from .nodes.transfer_node import handle_transfer
 from utils.llm_connector import run_llm
 
 

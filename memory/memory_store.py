@@ -3,16 +3,19 @@ import os
 import time
 import mysql.connector
 from mysql.connector import pooling
+from dotenv import load_dotenv
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+load_dotenv()
+
 DB_CONFIG = {
-    "host": os.environ.get("MYSQL_HOST", "localhost"),
-    "user": os.environ.get("MYSQL_USER", "root"),
-    "password": os.environ.get("MYSQL_PASSWORD", ""),
-    "database": os.environ.get("MYSQL_DB", "vfa"),
-    "port": int(os.environ.get("MYSQL_PORT", "3306")),
+    "host": os.environ.get("DB_HOST", "localhost"),
+    "user": os.environ.get("DB_USER", "root"),
+    "password": os.environ.get("DB_PASSWORD", ""),
+    "database": os.environ.get("DB_NAME", "vfa"),
+    "port": int(os.environ.get("DB_PORT", "3306")),
 }
 
 # Connection pool

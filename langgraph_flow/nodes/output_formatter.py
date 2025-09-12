@@ -1,6 +1,4 @@
 # langgraph_flow/nodes/output_formatter.py
-
-
 def format_spend_response(insight: dict) -> dict:
     details = insight.get("details", {})
     result = insight.get("result", {})

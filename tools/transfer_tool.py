@@ -1,3 +1,4 @@
+# tools/transfer_tool.py
 import json, os, random
 from datetime import datetime
 from utils.logger import get_logger
@@ -38,7 +39,7 @@ def resolve_beneficiary(nickname: str):
 def generate_otp(user_id: int) -> str:
     otp = str(random.randint(100000, 999999))
     OTP_STORE[user_id] = otp
-    logger.info("Generated OTP for user %d: %s", user_id, otp)
+    logger.info("Generated OTP for user %s: %s", user_id, otp)
     return otp
 
 

@@ -1,3 +1,4 @@
+# tools/offers_tool.py
 import json
 import os
 from utils.logger import get_logger

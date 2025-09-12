@@ -1,3 +1,4 @@
+# langgraph_flow/nodes/offers_node.py
 from tools.offers_tool import get_offers
 from utils.logger import get_logger
 

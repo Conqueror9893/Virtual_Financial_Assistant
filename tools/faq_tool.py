@@ -1,3 +1,4 @@
+# tools/faq_tool.py
 import fitz  # PyMuPDF
 import re
 from utils.logger import get_logger
