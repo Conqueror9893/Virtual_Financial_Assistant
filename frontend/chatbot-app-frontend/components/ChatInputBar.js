@@ -22,10 +22,10 @@ export default function ChatInputBar({ value, onChangeText, onMicPress }) {
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
-    marginBottom: 40,
+    marginBottom: 30,
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 26,
+    borderRadius: 25,
     alignItems: 'center',
     paddingHorizontal: 16,
     shadowColor: '#000',

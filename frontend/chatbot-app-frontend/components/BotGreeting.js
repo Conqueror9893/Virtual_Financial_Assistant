@@ -17,13 +17,15 @@ export default function BotGreeting() {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginBottom: 12,
+    borderWidth: 4,
+    borderColor: '#fff',
   },
   headerText: {
     fontSize: 22,
@@ -33,7 +35,7 @@ const styles = StyleSheet.create({
   },
   subText: {
     fontSize: 16,
-    color: '#444',
+    color: '#333',
     textAlign: 'center',
     maxWidth: '80%',
   },

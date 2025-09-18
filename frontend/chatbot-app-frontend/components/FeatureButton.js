@@ -12,15 +12,13 @@ export default function FeatureButton({ icon, label, onPress }) {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#f5f5f6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-    margin: 8,
+    backgroundColor: '#f7f7f7',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    margin: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 150,
-    justifyContent: 'center',
   },
   iconWrapper: {
     marginRight: 8,

@@ -2,13 +2,13 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import FeatureButton from './FeatureButton';
 
-import { MaterialIcons, FontAwesome, Entypo, Feather } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 export default function FeatureButtonsGrid({ onSelect }) {
   return (
     <View style={styles.container}>
       <FeatureButton
-        icon={<MaterialIcons name="payment" size={20} color="#555" />}
+        icon={<MaterialIcons name="format-list-bulleted" size={20} color="#555" />}
         label="Payments & transfers"
         onPress={() => onSelect('payments')}
       />
@@ -18,17 +18,17 @@ export default function FeatureButtonsGrid({ onSelect }) {
         onPress={() => onSelect('spending')}
       />
       <FeatureButton
-        icon={<FontAwesome name="coins" size={20} color="#555" />}
+        icon={<Ionicons name="wallet-outline" size={20} color="#555" />}
         label="Personal finance & accounts"
         onPress={() => onSelect('finance')}
       />
       <FeatureButton
-        icon={<Entypo name="news" size={20} color="#555" />}
+        icon={<FontAwesome5 name="piggy-bank" size={20} color="#555" />}
         label="Savings & investments"
         onPress={() => onSelect('savings')}
       />
       <FeatureButton
-        icon={<Feather name="help-circle" size={20} color="#555" />}
+        icon={<Ionicons name="bulb-outline" size={20} color="#555" />}
         label="Support & service"
         onPress={() => onSelect('support')}
       />
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   container: {
     flexWrap: 'wrap',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     marginBottom: 24,
   },
 });

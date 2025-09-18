@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import Header from '../components/Header';
 import BotGreeting from '../components/BotGreeting';
@@ -24,25 +25,41 @@ export default function ChatbotLandingPage({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Header onBack={handleBack} />
-        <BotGreeting />
-        <FeatureButtonsGrid onSelect={handleFeatureSelect} />
-      </ScrollView>
-      <ChatInputBar
-        value={inputText}
-        onChangeText={setInputText}
-        onMicPress={handleMicPress}
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#fde7d5', '#ffffff']}
+        style={styles.gradient}
       />
-    </SafeAreaView>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Header onBack={handleBack} />
+          <BotGreeting />
+          <FeatureButtonsGrid onSelect={handleFeatureSelect} />
+        </ScrollView>
+        <ChatInputBar
+          value={inputText}
+          onChangeText={setInputText}
+          onMicPress={handleMicPress}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fcbd86', // Gradient is simplified here
+  },
+  gradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '100%',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   content: {
     paddingVertical: 20,
