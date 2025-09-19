@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, View, Platform} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Header from '../components/Header';
@@ -23,32 +23,51 @@ export default function ChatbotLandingPage({ navigation }) {
     // Placeholder: handle voice input action
     console.log('Mic pressed');
   }
-
+  const isWeb = Platform.OS === 'web';
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#fde7d5', '#ffffff']}
-        style={styles.gradient}
-      />
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <Header onBack={handleBack} />
-          <BotGreeting />
-          <FeatureButtonsGrid onSelect={handleFeatureSelect} />
-        </ScrollView>
-        <ChatInputBar
-          value={inputText}
-          onChangeText={setInputText}
-          onMicPress={handleMicPress}
+    <View style={styles.outerContainer}>
+      <View style={isWeb ? styles.webContainer : styles.container}>
+        <LinearGradient
+          colors={['#fea572', '#ffffff']}
+          style={styles.gradient}
         />
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView contentContainerStyle={styles.content}>
+            <Header onBack={handleBack} />
+            <BotGreeting />
+            <FeatureButtonsGrid onSelect={handleFeatureSelect} />
+          </ScrollView>
+          <ChatInputBar
+            value={inputText}
+            onChangeText={setInputText}
+            onMicPress={handleMicPress}
+          />
+        </SafeAreaView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
+    width: '100%',
+  },
+  webContainer: {
+    width: 380,
+    height: 640,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', // valid only in web, harmless on native
   },
   gradient: {
     position: 'absolute',

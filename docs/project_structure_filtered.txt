@@ -1,0 +1,102 @@
+--- Folder Structure ---
+.env
+[api]
+    └── main.py
+[data]
+    ├── [assets]
+        └── AL-Masraf Bank - Demo.zip
+    ├── beneficiaries.json
+    ├── faqs.pdf
+    ├── offers.json
+    └── transactions.xlsx
+[docs]
+    ├── .project_structure_filter
+    ├── .project_structure_ignore
+    └── project_structure.txt
+[frontend]
+    ├── [assets]
+        └── Landing_Page.png
+    ├── [chatbot-app-frontend]
+        ├── [app]
+            ├── [(tabs)]
+                ├── explore.tsx
+                ├── index.tsx
+                └── _layout.tsx
+            ├── chat.js
+            ├── index.js
+            ├── modal.tsx
+            └── _layout.tsx
+        ├── app.json
+        ├── [assets]
+            └── [images]
+                ├── android-icon-background.png
+                ├── android-icon-foreground.png
+                ├── android-icon-monochrome.png
+                ├── favicon.png
+                ├── icon.png
+                ├── partial-react-logo.png
+                ├── react-logo.png
+                ├── react-logo@2x.png
+                ├── react-logo@3x.png
+                └── splash-icon.png
+        ├── [components]
+            ├── BotGreeting.js
+            ├── ChatInputBar.js
+            ├── external-link.tsx
+            ├── FeatureButton.js
+            ├── FeatureButtonsGrid.js
+            ├── haptic-tab.tsx
+            ├── Header.js
+            ├── hello-wave.tsx
+            ├── parallax-scroll-view.tsx
+            ├── themed-text.tsx
+            ├── themed-view.tsx
+            └── [ui]
+                ├── collapsible.tsx
+                ├── icon-symbol.ios.tsx
+                └── icon-symbol.tsx
+        ├── [constants]
+            └── theme.ts
+        ├── eslint.config.js
+        ├── expo-env.d.ts
+        ├── [hooks]
+            ├── use-color-scheme.ts
+            ├── use-color-scheme.web.ts
+            └── use-theme-color.ts
+        ├── package-lock.json
+        ├── package.json
+        ├── README.md
+        ├── [screens]
+            └── ChatbotLandingPage.js
+        ├── [scripts]
+            └── reset-project.js
+        ├── theme.js
+        └── tsconfig.json
+    ├── package-lock.json
+    └── package.json
+[langgraph_flow]
+    ├── langgraph_flow.py
+    ├── [nodes]
+        ├── faq_node.py
+        ├── intent_classifier.py
+        ├── offers_node.py
+        ├── output_formatter.py
+        ├── spend_insights_node.py
+        └── transfer_node.py
+    └── __init__.py
+LICENSE
+[memory]
+    └── memory_store.py
+README.md
+requirements.txt
+[tools]
+    ├── faq_tool.py
+    ├── offers_tool.py
+    ├── spend_insights.py
+    └── transfer_tool.py
+[utils]
+    ├── llm_connector.py
+    ├── logger.py
+    └── otp.py
+
+--- File Contents ---
