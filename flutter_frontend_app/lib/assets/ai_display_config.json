@@ -1,0 +1,19 @@
+{
+  "title": "Speaking to Ai Bot",
+  "backgroundGradient": ["0xFFFFAD80", "0xFFFFFEFD"],
+  "avatarBgColor": "0xFFF87B2D",
+  "avatarIcon": "assets/avatar.png",
+  "greetingIntro": "Hi, I'm ",
+  "botName": "Appzia",
+  "greetingLine1": "I can help you check your",
+  "greetingLine2": "accounts, spending, or transfers",
+  "suggestions": [
+    { "icon": "assets/payments.png", "label": "Payments & transfers" },
+    { "icon": "assets/spends.png", "label": "Spending insights" },
+    { "icon": "assets/transfer.png", "label": "Personal finance & accounts" },
+    { "icon": "assets/savings.png", "label": "Savings & investments" },
+    { "icon": "assets/support.png", "label": "Support & service" },
+    { "icon": "assets/search.png", "label": "Last electricity bill payment" }
+  ],
+  "inputHint": "Chat with Appzia"
+}
