@@ -566,17 +566,19 @@ class ConversationPhase(str, Enum):
     NORMAL = "normal"
     OTP = "otp"
     CONFIRMATION = "confirmation"
+    INTERRUPTION_CONFIRMATION = "interruption_confirmation"
 
 # ---------- State Definition ----------
 class AgentState(TypedDict, total=False):
     user_input: str
-    intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]
+    intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown", "interruption_confirmation"]
     result: Any
     phase: ConversationPhase
     otp_attempts: int
     pending_transfer: Optional[Dict]
     confirmation_context: Optional[Dict]
     user_id: str
+    interrupted_state: Optional[Dict]
 
 # ---------- Helpers ----------
 VALID_INTENTS = {"spend", "faq", "offers", "transfer"}
@@ -627,41 +629,80 @@ def run_handler(state: AgentState, handler_fn) -> AgentState:
 
 # ---------- Intent Classification Node ----------
 def classify_intent(state: AgentState) -> AgentState:
-    # Defensive defaulting
+    """
+    Classifies intent and handles interruptions in sensitive phases.
+    """
     ensure_state_defaults(state)
     phase = to_phase(state.get("phase"))
+    user_input = state.get("user_input", "").lower().strip()
 
-    if phase == ConversationPhase.OTP:
+    # --- Interruption Detection ---
+    is_interruption = False
+    if phase == ConversationPhase.OTP and not user_input.isdigit():
+        is_interruption = True
+    elif phase == ConversationPhase.CONFIRMATION and user_input not in ["yes", "no"]:
+        is_interruption = True
+
+    if is_interruption:
+        # Classify the new, interrupting query
+        new_intent = classify_new_query(user_input)
+        if new_intent != "unknown":
+            # It's a valid, different intent. Trigger interruption confirmation.
+            state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
+            state["intent"] = "interruption_confirmation"
+            # Save the state before this interruption
+            state["interrupted_state"] = {
+                "phase": phase,
+                "pending_transfer": state.get("pending_transfer"),
+                "confirmation_context": state.get("confirmation_context"),
+                "otp_attempts": state.get("otp_attempts"),
+                "new_intent": new_intent, # Store the intent of the interrupting query
+            }
+            return state
+        # If the new intent is "unknown", treat it as irrelevant input for the current phase
+        # and let the respective node handle it (e.g., re-prompt for OTP).
+
+    # --- Standard Intent Classification ---
+    if phase == ConversationPhase.INTERRUPTION_CONFIRMATION:
+        state["intent"] = "interruption_confirmation"
+    elif phase == ConversationPhase.OTP:
         state["intent"] = "otp"
-        return state
-    if phase == ConversationPhase.CONFIRMATION:
+    elif phase == ConversationPhase.CONFIRMATION:
         state["intent"] = "confirmation"
-        return state
+    elif phase == ConversationPhase.NORMAL:
+        state["intent"] = classify_new_query(user_input)
+    else: # Should not happen, but as a fallback
+        state["intent"] = "unknown"
 
+    return state
+
+def classify_new_query(user_input: str) -> str:
+    """
+    Classifies a new user query using LLM with a fallback.
+    Returns one of: spend, faq, offers, transfer, unknown.
+    """
     prompt = f"""
     Classify the user query into: spend, faq, offers, transfer, or unknown.
-    Query: "{state.get('user_input', '')}"
+    Query: "{user_input}"
     Return only the label.
     """
     try:
         raw = run_llm(prompt)
         raw_label = (raw or "").strip().lower()
-        state["intent"] = raw_label if raw_label in VALID_INTENTS else "unknown"
+        return raw_label if raw_label in VALID_INTENTS else "unknown"
     except Exception as e:
         logger.exception("LLM intent classification failed")
-        # fallback simple keyword heuristics as safety-net:
-        ui = state.get("user_input", "").lower()
-        if "transfer" in ui or "send" in ui:
-            state["intent"] = "transfer"
-        elif "spend" in ui or "transactions" in ui:
-            state["intent"] = "spend"
-        elif "offer" in ui or "discount" in ui:
-            state["intent"] = "offers"
-        elif "how" in ui or "what" in ui or "faq" in ui:
-            state["intent"] = "faq"
+        # Fallback to simple keyword heuristics
+        if "transfer" in user_input or "send" in user_input:
+            return "transfer"
+        elif "spend" in user_input or "transactions" in user_input:
+            return "spend"
+        elif "offer" in user_input or "discount" in user_input:
+            return "offers"
+        elif "how" in user_input or "what" in user_input or "faq" in user_input:
+            return "faq"
         else:
-            state["intent"] = "unknown"
-    return state
+            return "unknown"
 
 # ---------- Handlers ----------
 def spends_node(state: AgentState) -> AgentState:
@@ -820,6 +861,54 @@ def confirmation_node(state: AgentState) -> AgentState:
         })
     return state
 
+# ---------- Interruption Confirmation Node ----------
+def interruption_confirmation_node(state: AgentState) -> AgentState:
+    """Handles the interruption confirmation flow."""
+    ensure_state_defaults(state)
+    user_input = state.get("user_input", "").lower().strip()
+    interrupted_state = state.get("interrupted_state")
+
+    if user_input == "yes":
+        # User wants to abandon the old task and start the new one.
+        # The new intent is stored in the interrupted_state.
+        new_intent = interrupted_state.get("new_intent", "unknown")
+        state["intent"] = new_intent
+        state["phase"] = ConversationPhase.NORMAL
+        # Clear all context from the interrupted task
+        state["pending_transfer"] = None
+        state["confirmation_context"] = None
+        state["otp_attempts"] = 0
+        state["interrupted_state"] = None
+        # The graph will now route to the node for the `new_intent`.
+        # We don't set a result here, as the next node will do it.
+
+    elif user_input == "no":
+        # User wants to continue the old task.
+        # Restore the previous phase and context.
+        state["phase"] = to_phase(interrupted_state.get("phase"))
+        state["intent"] = str(state["phase"]) # intent should match the phase, e.g., "otp"
+        state["pending_transfer"] = interrupted_state.get("pending_transfer")
+        state["confirmation_context"] = interrupted_state.get("confirmation_context")
+        state["otp_attempts"] = interrupted_state.get("otp_attempts", 0)
+        state["interrupted_state"] = None
+        # Provide a message to guide the user back to the task
+        if state["phase"] == ConversationPhase.OTP:
+            state["result"] = "Ok, let's continue with the transfer. Please provide the OTP."
+        elif state["phase"] == ConversationPhase.CONFIRMATION:
+            state["result"] = "Alright, let's continue. Please reply with 'yes' or 'no' to the recommendation."
+        else: # Fallback
+            state["result"] = "Resuming your previous action."
+
+    else:
+        # The user's response was not a clear 'yes' or 'no'.
+        # Re-prompt for confirmation.
+        state["result"] = "Please answer with 'yes' to start a new task or 'no' to continue with the current one."
+        # Keep the phase as INTERRUPTION_CONFIRMATION so this node is hit again
+        state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
+        state["intent"] = "interruption_confirmation"
+
+    return state
+
 # ---------- Unknown Node ----------
 def unknown_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
@@ -830,6 +919,7 @@ def unknown_node(state: AgentState) -> AgentState:
 def build_flow():
     workflow = StateGraph(AgentState)
 
+    # --- Add Nodes ---
     workflow.add_node("classify_intent", classify_intent)
     workflow.add_node("spend", spends_node)
     workflow.add_node("faq", faq_node)
@@ -837,10 +927,13 @@ def build_flow():
     workflow.add_node("transfer", transfer_node)
     workflow.add_node("otp", otp_node)
     workflow.add_node("confirmation", confirmation_node)
+    workflow.add_node("interruption_confirmation", interruption_confirmation_node)
     workflow.add_node("unknown", unknown_node)
 
+    # --- Add Edges ---
     workflow.set_entry_point("classify_intent")
 
+    # This is the main router of the graph
     workflow.add_conditional_edges(
         "classify_intent",
         lambda state: state.get("intent", "unknown"),
@@ -851,10 +944,15 @@ def build_flow():
             "transfer": "transfer",
             "otp": "otp",
             "confirmation": "confirmation",
+            "interruption_confirmation": "interruption_confirmation",
             "unknown": "unknown",
         },
     )
 
+    # After handling an interruption, the graph should re-evaluate the new state
+    workflow.add_edge("interruption_confirmation", "classify_intent")
+
+    # All other terminal nodes end the flow for the current turn
     for node in ["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]:
         workflow.add_edge(node, END)
 
