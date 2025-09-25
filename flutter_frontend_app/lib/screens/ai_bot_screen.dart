@@ -4,10 +4,20 @@ import 'package:flutter_frontend_app/widgets/bot_avatar_greeting.dart';
 import 'package:flutter_frontend_app/widgets/suggestion_chips.dart';
 import 'package:flutter_frontend_app/widgets/chat_input_field.dart';
 import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
+import 'package:flutter_frontend_app/models/chat_message.dart';
+import 'package:flutter_frontend_app/widgets/user_message_bubble.dart';
+import 'package:flutter_frontend_app/widgets/bot_message_bubble.dart';
 
-class AiBotScreen extends StatelessWidget {
+class AiBotScreen extends StatefulWidget {
   final AiDisplayData displayData;
   const AiBotScreen({super.key, required this.displayData});
+
+  @override
+  State<AiBotScreen> createState() => _AiBotScreenState();
+}
+
+class _AiBotScreenState extends State<AiBotScreen> {
+  final List<ChatMessage> _messages = [];
 
   @override
   Widget build(BuildContext context) {
@@ -49,11 +59,11 @@ class AiBotScreen extends StatelessWidget {
   Widget _buildChatContainer() {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: CustomAppBar(title: displayData.title),
+      appBar: CustomAppBar(title: widget.displayData.title),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: displayData.backgroundGradient,
+            colors: widget.displayData.backgroundGradient,
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: const [0.0, 0.33],
@@ -63,24 +73,60 @@ class AiBotScreen extends StatelessWidget {
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
+                child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 60),
-                      BotAvatarGreeting(displayData: displayData),
-                      const SizedBox(height: 32),
-                      SuggestionChips(suggestions: displayData.suggestions),
-                    ],
-                  ),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    if (message is UserMessage) {
+                      return UserMessageBubble(text: message.text);
+                    }
+                    if (message is BotMessage) {
+                      return BotMessageBubble(message: message);
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ),
-              ChatInputField(hintText: displayData.inputHint),
+              ChatInputField(
+                hintText: widget.displayData.inputHint,
+                onSendMessage: _sendMessage,
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _sendMessage(String text) {
+    final userMessage = UserMessage(id: DateTime.now().toString(), text: text);
+    setState(() {
+      _messages.add(userMessage);
+    });
+
+    // Simulate a bot response
+    Future.delayed(const Duration(seconds: 1), () {
+      final botMessage = BotMessage(
+        id: DateTime.now().toString(),
+        title: 'Monthly spending summary - August 2025',
+        totalSpent: 82450,
+        breakdown: {
+          'Rent': 25000,
+          'Groceries': 12500,
+          'Transport': 6800,
+          'Dining & Food': 5600,
+          'Internet': 1450,
+          'Health': 4500,
+          'EMI': 15400,
+        },
+        spendingTrend:
+            'Paid: ₹4,850 more than July\nMost spent on: Rent\nMost frequent purchases: Groceries',
+        summary: 'Summarise',
+      );
+      setState(() {
+        _messages.add(botMessage);
+      });
+    });
   }
 }
