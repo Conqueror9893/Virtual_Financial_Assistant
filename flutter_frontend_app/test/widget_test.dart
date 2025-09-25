@@ -7,13 +7,21 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_frontend_app/main.dart';
+import 'package:flutter_frontend_app/screens/ai_bot_screen.dart';
+import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    final String configString =
+        await rootBundle.loadString('lib/assets/ai_display_config.json');
+    final Map<String, dynamic> configJson = jsonDecode(configString);
+
+    final displayData = AiDisplayData.fromJson(configJson);
+    await tester.pumpWidget(AiBotScreen(displayData: displayData));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

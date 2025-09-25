@@ -26,7 +26,7 @@ def save_user_state(user_id, state):
     with state_lock:
         user_states[user_id] = state
 
-@unified_api.route("/unified_query", methods=["POST"])
+@unified_api.route("/chat", methods=["POST"])
 def unified_query():
     """Single entry point for all user queries."""
     data = request.json or {}
