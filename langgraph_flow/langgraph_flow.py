@@ -1,544 +1,3 @@
-# # langraph_flow/langgraph_flow.py
-# from langgraph.graph import StateGraph, END
-# from langchain.schema import HumanMessage, AIMessage
-# from typing import TypedDict, Literal, Optional, Dict
-# import json
-# # Import your usecase handlers
-# from .nodes.spend_insights_node import handle_spend_insight
-# from .nodes.faq_node import handle_faq
-# from .nodes.offers_node import handle_offers
-# from .nodes.transfer_node import handle_transfer
-# from utils.llm_connector import run_llm
-
-
-# # ---------- State Definition ----------
-# class AgentState(TypedDict):
-#     user_input: str
-#     intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]
-#     result: str
-#     awaiting_otp: bool
-#     otp_attempts: int  
-#     pending_transfer: Optional[Dict]  # stores original transfer query/details
-#     awaiting_confirmation: bool
-#     confirmation_context: Optional[Dict]
-
-# # ---------- Intent Classification Node ----------
-# def classify_intent(state: AgentState) -> AgentState:
-#     if state.get("awaiting_otp"):
-#         state["intent"] = "otp"
-#         return state
-#     if state.get("awaiting_confirmation"):
-#         state["intent"] = "confirmation"
-#         return state
-
-#     prompt = f"""
-#     Classify the user query into one of these intents:
-#     - spend (transactional/spending insights)
-#     - faq (banking related Q&A)
-#     - offers (discounts, deals, promotions)
-#     - transfer (fund transfer request)
-#     - unknown (none of the above)
-
-#     User query: "{state['user_input']}"
-#     Return only the intent label.
-#     """
-#     raw = run_llm(prompt)
-#     intent = raw.lower().strip()
-#     if intent not in ["spend", "faq", "offers", "transfer"]:
-#         intent = "unknown"
-#     state["intent"] = intent
-#     return state
-
-
-# # ---------- Handlers ----------
-# def spends_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_spend_insight(user_id, state["user_input"])
-#     return state
-
-# def faq_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_faq(user_id, state["user_input"])
-#     return state
-
-# def offers_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_offers(user_id, state["user_input"])
-#     return state
-
-# def transfer_node(state: AgentState) -> AgentState:
-#     user_id = 0
-#     user_input_str = state["user_input"].strip()
-
-#     # Redirect OTP input mistakenly routed here to otp node
-#     if state.get("awaiting_otp") and user_input_str.isdigit():
-#         state["intent"] = "otp"
-#         state["result"] = {"status": "error", "message": "Redirecting input to OTP validation."}
-#         return state
-
-#     otp = None
-#     transfer_result = handle_transfer(user_id, user_input_str, otp)
-
-#     state["result"] = transfer_result
-
-#     if isinstance(transfer_result, dict) and transfer_result.get("status") == "otp_required":
-#         # Save parsed transfer details returned from handle_transfer
-#         # You must modify handle_transfer to return parsed details in the response, e.g., under key "transfer_details"
-#         parsed_details = transfer_result.get("transfer_details")
-#         state["awaiting_otp"] = True
-#         state["pending_transfer"] = {
-#             "query": user_input_str,
-#             "other": transfer_result,
-#             "transfer_details": parsed_details
-#         }
-#         state["intent"] = "otp"
-#     else:
-#         state["awaiting_otp"] = False
-#         state["pending_transfer"] = None
-
-#     return state
-
-
-# # ---------- OTP Node ----------
-# def otp_node(state: AgentState) -> AgentState:
-#     user_id = 0
-#     otp = state["user_input"].strip()
-#     pending = state.get("pending_transfer") or {}
-
-#     # Init attempts if not present
-#     if "otp_attempts" not in state or state["otp_attempts"] is None:
-#         state["otp_attempts"] = 0
-
-#     parsed_transfer_details = pending.get("transfer_details")
-#     if not parsed_transfer_details:
-#         state["result"] = {"status": "error", "message": "No pending transfer details found for OTP. Please restart transfer."}
-#         state["awaiting_otp"] = False
-#         state["pending_transfer"] = None
-#         state["otp_attempts"] = 0
-#         return state
-    
-#     if isinstance(parsed_transfer_details, str):
-#         try:
-#             parsed_transfer_details = json.loads(parsed_transfer_details)
-#         except Exception as e:
-#             state["result"] = {"status": "error", "message": f"Failed to parse transfer details: {e}"}
-#             state["awaiting_otp"] = False
-#             state["pending_transfer"] = None
-#             state["otp_attempts"] = 0
-#             return state
-
-#     transfer_result = handle_transfer(user_id, parsed_transfer_details, otp)
-
-#     # If OTP is incorrect
-#     if transfer_result.get("status") == "otp_incorrect":
-#         state["otp_attempts"] += 1
-#         if state["otp_attempts"] >= 3:
-#             state["result"] = {"status": "failed", "message": "Maximum OTP attempts reached. Transfer cancelled."}
-#             state["awaiting_otp"] = False
-#             state["pending_transfer"] = None
-#             state["otp_attempts"] = 0
-#         else:
-#             remaining = 3 - state["otp_attempts"]
-#             state["result"] = {"status": "error", "message": f"Incorrect OTP. You have {remaining} attempt(s) left."}
-#             state["awaiting_otp"] = True
-#         return state
-
-#     # OTP is correct or other result
-#     state["result"] = transfer_result
-#     state["awaiting_otp"] = False
-#     state["pending_transfer"] = None
-#     state["otp_attempts"] = 0
-
-#     if transfer_result.get("status") == "success" and transfer_result.get("recommendation"):
-#         state["awaiting_confirmation"] = True
-#         state["confirmation_context"] = {
-#             "action": "setup_monthly_transfer",
-#             "details": transfer_result
-#         }
-#     else:
-#         state["awaiting_confirmation"] = False
-#         state["confirmation_context"] = None
-
-#     return state
-
-
-# def confirmation_node(state: AgentState) -> AgentState:
-#     user_input = state["user_input"].strip().lower()
-#     if not state.get("awaiting_confirmation"):
-#         state["result"] = "No pending confirmation. How can I assist you?"
-#         return state
-
-#     if user_input == "yes":
-#         # Implement actual monthly transfer setup logic here
-#         # For demo, just return a success message
-#         confirmation_result = {
-#             "status": "success",
-#             "message": "Monthly transfer setup successful. Your transfer will recur monthly."
-#         }
-#         state["result"] = confirmation_result
-#     elif user_input == "no":
-#         state["result"] = "Okay, monthly transfer not set up."
-#     else:
-#         state["result"] = "Please reply with 'yes' or 'no'."
-
-#     # Clear confirmation state after handling
-#     if user_input in ["yes", "no"]:
-#         state["awaiting_confirmation"] = False
-#         state["confirmation_context"] = None
-
-#     return state
-
-
-# def unknown_node(state: AgentState) -> AgentState:
-#     state["result"] = "Sorry, I didn't understand your request. Could you rephrase?"
-#     return state
-
-
-# def build_flow():
-#     workflow = StateGraph(AgentState)
-
-#     # Nodes
-#     workflow.add_node("classify_intent", classify_intent)
-#     workflow.add_node("spend", spends_node)
-#     workflow.add_node("faq", faq_node)
-#     workflow.add_node("offers", offers_node)
-#     workflow.add_node("transfer", transfer_node)
-#     workflow.add_node("otp", otp_node)
-#     workflow.add_node("confirmation", confirmation_node)
-#     workflow.add_node("unknown", unknown_node)
-
-#     # Edges
-#     workflow.set_entry_point("classify_intent")
-#     workflow.add_conditional_edges(
-#         "classify_intent",
-#         lambda state: state["intent"],
-#         {
-#             "spend": "spend",
-#             "faq": "faq",
-#             "offers": "offers",
-#             "transfer": "transfer",
-#             "otp": "otp",
-#             "confirmation": "confirmation",
-#             "unknown": "unknown",
-#         },
-#     )
-
-#     # Exit edges
-#     workflow.add_edge("spend", END)
-#     workflow.add_edge("faq", END)
-#     workflow.add_edge("offers", END)
-#     workflow.add_edge("transfer", END)
-#     workflow.add_edge("otp", END)
-#     workflow.add_edge("confirmation", END)
-#     workflow.add_edge("unknown", END)
-
-#     return workflow.compile()
-
-
-# if __name__ == "__main__":
-#     graph = build_flow()
-#     state = {
-#         "user_input": "",
-#         "intent": "unknown",
-#         "result": "",
-#         "awaiting_otp": False,
-#         "pending_transfer": None,
-#         "awaiting_confirmation": False,
-#         "confirmation_context": None,
-#     }
-
-#     while True:
-#         user_input = input("You: ").strip()
-#         if user_input.lower() in ["quit", "exit"]:
-#             break
-#         state["user_input"] = user_input
-
-#         # Override intent when awaiting OTP or confirmation
-#         if state.get("awaiting_otp"):
-#             state["intent"] = "otp"
-#         elif state.get("awaiting_confirmation"):
-#             state["intent"] = "confirmation"
-#         else:
-#             state["intent"] = "unknown"
-
-#         result = graph.invoke(state)
-#         print("Bot:", result["result"])
-#         state.update(result)
-
-# # langraph_flow/langgraph_flow.py
-# from langgraph.graph import StateGraph, END
-# from langchain.schema import HumanMessage, AIMessage
-# from typing import TypedDict, Literal, Optional, Dict
-# import json
-# # Import your usecase handlers
-# from .nodes.spend_insights_node import handle_spend_insight
-# from .nodes.faq_node import handle_faq
-# from .nodes.offers_node import handle_offers
-# from .nodes.transfer_node import handle_transfer, confirm_recommendation
-# from utils.logger import get_logger
-# from utils.llm_connector import run_llm
-
-# logger = get_logger("LangGraphFlow")
-
-# # ---------- State Definition ----------
-# class AgentState(TypedDict):
-#     user_input: str
-#     intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]
-#     result: str
-#     awaiting_otp: bool
-#     otp_attempts: int  
-#     pending_transfer: Optional[Dict]  # stores original transfer query/details
-#     awaiting_confirmation: bool
-#     confirmation_context: Optional[Dict]
-
-# # ---------- Intent Classification Node ----------
-# def classify_intent(state: AgentState) -> AgentState:
-#     if state.get("awaiting_otp"):
-#         state["intent"] = "otp"
-#         return state
-#     if state.get("awaiting_confirmation"):
-#         state["intent"] = "confirmation"
-#         return state
-
-#     prompt = f"""
-#     Classify the user query into one of these intents:
-#     - spend (transactional/spending insights)
-#     - faq (banking related Q&A)
-#     - offers (discounts, deals, promotions)
-#     - transfer (fund transfer request)
-#     - unknown (none of the above)
-
-#     User query: "{state['user_input']}"
-#     Return only the intent label.
-#     """
-#     raw = run_llm(prompt)
-#     intent = raw.lower().strip()
-#     if intent not in ["spend", "faq", "offers", "transfer"]:
-#         intent = "unknown"
-#     state["intent"] = intent
-#     return state
-
-
-# # ---------- Handlers ----------
-# def spends_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_spend_insight(user_id, state["user_input"])
-#     return state
-
-# def faq_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_faq(user_id, state["user_input"])
-#     return state
-
-# def offers_node(state: AgentState) -> AgentState:
-#     user_id = 0  # or retrieve actual user_id from context if available
-#     state["result"] = handle_offers(user_id, state["user_input"])
-#     return state
-
-# def transfer_node(state: AgentState) -> AgentState:
-#     user_id = 0
-#     user_input_str = state["user_input"].strip()
-
-#     # Redirect OTP input mistakenly routed here to otp node
-#     if state.get("awaiting_otp") and user_input_str.isdigit():
-#         state["intent"] = "otp"
-#         state["result"] = {"status": "error", "message": "Redirecting input to OTP validation."}
-#         return state
-
-#     otp = None
-#     transfer_result = handle_transfer(user_id, user_input_str, otp)
-
-#     state["result"] = transfer_result
-
-#     if isinstance(transfer_result, dict) and transfer_result.get("status") == "otp_required":
-#         # Save parsed transfer details returned from handle_transfer
-#         # You must modify handle_transfer to return parsed details in the response, e.g., under key "transfer_details"
-#         parsed_details = transfer_result.get("transfer_details")
-#         state["awaiting_otp"] = True
-#         state["pending_transfer"] = {
-#             "query": user_input_str,
-#             "other": transfer_result,
-#             "transfer_details": parsed_details
-#         }
-#         state["intent"] = "otp"
-#     else:
-#         state["awaiting_otp"] = False
-#         state["pending_transfer"] = None
-
-#     return state
-
-
-# # ---------- OTP Node ----------
-# def otp_node(state: AgentState) -> AgentState:
-#     user_id = 0
-#     otp = state["user_input"].strip()
-#     pending = state.get("pending_transfer") or {}
-
-#     # Init attempts if not present
-#     if "otp_attempts" not in state or state["otp_attempts"] is None:
-#         state["otp_attempts"] = 0
-
-#     parsed_transfer_details = pending.get("transfer_details")
-#     if not parsed_transfer_details:
-#         state["result"] = {"status": "error", "message": "No pending transfer details found for OTP. Please restart transfer."}
-#         state["awaiting_otp"] = False
-#         state["pending_transfer"] = None
-#         state["otp_attempts"] = 0
-#         return state
-    
-#     if isinstance(parsed_transfer_details, str):
-#         try:
-#             parsed_transfer_details = json.loads(parsed_transfer_details)
-#         except Exception as e:
-#             state["result"] = {"status": "error", "message": f"Failed to parse transfer details: {e}"}
-#             state["awaiting_otp"] = False
-#             state["pending_transfer"] = None
-#             state["otp_attempts"] = 0
-#             return state
-
-#     transfer_result = handle_transfer(user_id, parsed_transfer_details, otp)
-
-#     # If OTP is incorrect
-#     if transfer_result.get("status") == "otp_incorrect":
-#         state["otp_attempts"] += 1
-#         if state["otp_attempts"] >= 3:
-#             state["result"] = {"status": "failed", "message": "Maximum OTP attempts reached. Transfer cancelled."}
-#             state["awaiting_otp"] = False
-#             state["pending_transfer"] = None
-#             state["otp_attempts"] = 0
-#         else:
-#             remaining = 3 - state["otp_attempts"]
-#             state["result"] = {"status": "error", "message": f"Incorrect OTP. You have {remaining} attempt(s) left."}
-#             state["awaiting_otp"] = True
-#         return state
-
-#     # OTP is correct or other result
-#     state["result"] = transfer_result
-#     state["awaiting_otp"] = False
-#     state["pending_transfer"] = None
-#     state["otp_attempts"] = 0
-
-#     if transfer_result.get("status") == "success" and transfer_result.get("recommendation"):
-#         state["awaiting_confirmation"] = True
-#         state["confirmation_context"] = {
-#             "action": "confirm_recommendation",
-#             "details": transfer_result
-#         }
-#     else:
-#         state["awaiting_confirmation"] = False
-#         state["confirmation_context"] = None
-
-#     return state
-
-# def confirmation_node(state: AgentState) -> AgentState:
-#     user_input = state["user_input"].strip().lower()
-#     if not state.get("awaiting_confirmation"):
-#         state["result"] = "No pending confirmation. How can I assist you?"
-#         return state
-    
-#     ctx = state.get("confirmation_context") or {}
-#     if ctx.get("action") == "confirm_recommendation":
-#         details = ctx.get("details", {})
-#         beneficiary_id = details.get("beneficiary_id")
-#         recommendation_id = details.get("recommendation_id")
-        
-#         # Build body as required for confirm_recommendation
-#         body = {
-#             "user_id": state.get("user_id", "1"),  # use actual user_id if available
-#             "query": user_input
-#         }
-
-#         # Call new confirm_recommendation
-#         confirmation_result = confirm_recommendation(beneficiary_id, recommendation_id, body)
-#         state["result"] = confirmation_result
-#         state["awaiting_confirmation"] = False
-#         state["confirmation_context"] = None
-#         return state
-
-#     # This should not happen, but just in case
-#     state["result"] = "Unexpected confirmation request. Please try again."
-#     state["awaiting_confirmation"] = False
-#     state["confirmation_context"] = None
-#     return state
-
-
-# def unknown_node(state: AgentState) -> AgentState:
-#     state["result"] = "Sorry, I didn't understand your request. Could you rephrase?"
-#     return state
-
-
-# def build_flow():
-#     workflow = StateGraph(AgentState)
-
-#     # Nodes
-#     workflow.add_node("classify_intent", classify_intent)
-#     workflow.add_node("spend", spends_node)
-#     workflow.add_node("faq", faq_node)
-#     workflow.add_node("offers", offers_node)
-#     workflow.add_node("transfer", transfer_node)
-#     workflow.add_node("otp", otp_node)
-#     workflow.add_node("confirmation", confirmation_node)
-#     workflow.add_node("unknown", unknown_node)
-
-#     # Edges
-#     workflow.set_entry_point("classify_intent")
-#     workflow.add_conditional_edges(
-#         "classify_intent",
-#         lambda state: state["intent"],
-#         {
-#             "spend": "spend",
-#             "faq": "faq",
-#             "offers": "offers",
-#             "transfer": "transfer",
-#             "otp": "otp",
-#             "confirmation": "confirmation",
-#             "unknown": "unknown",
-#         },
-#     )
-
-#     # Exit edges
-#     workflow.add_edge("spend", END)
-#     workflow.add_edge("faq", END)
-#     workflow.add_edge("offers", END)
-#     workflow.add_edge("transfer", END)
-#     workflow.add_edge("otp", END)
-#     workflow.add_edge("confirmation", END)
-#     workflow.add_edge("unknown", END)
-
-#     return workflow.compile()
-
-
-# if __name__ == "__main__":
-#     graph = build_flow()
-#     state = {
-#         "user_input": "",
-#         "intent": "unknown",
-#         "result": "",
-#         "awaiting_otp": False,
-#         "pending_transfer": None,
-#         "awaiting_confirmation": False,
-#         "confirmation_context": None,
-#     }
-
-#     while True:
-#         user_input = input("You: ").strip()
-#         if user_input.lower() in ["quit", "exit"]:
-#             break
-#         state["user_input"] = user_input
-
-#         # Override intent when awaiting OTP or confirmation
-#         if state.get("awaiting_otp"):
-#             state["intent"] = "otp"
-#         elif state.get("awaiting_confirmation"):
-#             state["intent"] = "confirmation"
-#         else:
-#             state["intent"] = "unknown"
-
-#         result = graph.invoke(state)
-#         print("Bot:", result["result"])
-#         state.update(result)
-
-
 
 # langraph_flow/langraph_flow.py
 from langgraph.graph import StateGraph, END
@@ -566,17 +25,19 @@ class ConversationPhase(str, Enum):
     NORMAL = "normal"
     OTP = "otp"
     CONFIRMATION = "confirmation"
+    INTERRUPTION_CONFIRMATION = "interruption_confirmation"
 
 # ---------- State Definition ----------
 class AgentState(TypedDict, total=False):
     user_input: str
-    intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]
+    intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown", "interruption_confirmation"]
     result: Any
     phase: ConversationPhase
     otp_attempts: int
     pending_transfer: Optional[Dict]
     confirmation_context: Optional[Dict]
     user_id: str
+    interrupted_state: Optional[Dict]
 
 # ---------- Helpers ----------
 VALID_INTENTS = {"spend", "faq", "offers", "transfer"}
@@ -627,41 +88,80 @@ def run_handler(state: AgentState, handler_fn) -> AgentState:
 
 # ---------- Intent Classification Node ----------
 def classify_intent(state: AgentState) -> AgentState:
-    # Defensive defaulting
+    """
+    Classifies intent and handles interruptions in sensitive phases.
+    """
     ensure_state_defaults(state)
     phase = to_phase(state.get("phase"))
+    user_input = state.get("user_input", "").lower().strip()
 
-    if phase == ConversationPhase.OTP:
+    # --- Interruption Detection ---
+    is_interruption = False
+    if phase == ConversationPhase.OTP and not user_input.isdigit():
+        is_interruption = True
+    elif phase == ConversationPhase.CONFIRMATION and user_input not in ["yes", "no"]:
+        is_interruption = True
+
+    if is_interruption:
+        # Classify the new, interrupting query
+        new_intent = classify_new_query(user_input)
+        if new_intent != "unknown":
+            # It's a valid, different intent. Trigger interruption confirmation.
+            state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
+            state["intent"] = "interruption_confirmation"
+            # Save the state before this interruption
+            state["interrupted_state"] = {
+                "phase": phase,
+                "pending_transfer": state.get("pending_transfer"),
+                "confirmation_context": state.get("confirmation_context"),
+                "otp_attempts": state.get("otp_attempts"),
+                "new_intent": new_intent, # Store the intent of the interrupting query
+            }
+            return state
+        # If the new intent is "unknown", treat it as irrelevant input for the current phase
+        # and let the respective node handle it (e.g., re-prompt for OTP).
+
+    # --- Standard Intent Classification ---
+    if phase == ConversationPhase.INTERRUPTION_CONFIRMATION:
+        state["intent"] = "interruption_confirmation"
+    elif phase == ConversationPhase.OTP:
         state["intent"] = "otp"
-        return state
-    if phase == ConversationPhase.CONFIRMATION:
+    elif phase == ConversationPhase.CONFIRMATION:
         state["intent"] = "confirmation"
-        return state
+    elif phase == ConversationPhase.NORMAL:
+        state["intent"] = classify_new_query(user_input)
+    else: # Should not happen, but as a fallback
+        state["intent"] = "unknown"
 
+    return state
+
+def classify_new_query(user_input: str) -> str:
+    """
+    Classifies a new user query using LLM with a fallback.
+    Returns one of: spend, faq, offers, transfer, unknown.
+    """
     prompt = f"""
     Classify the user query into: spend, faq, offers, transfer, or unknown.
-    Query: "{state.get('user_input', '')}"
+    Query: "{user_input}"
     Return only the label.
     """
     try:
         raw = run_llm(prompt)
         raw_label = (raw or "").strip().lower()
-        state["intent"] = raw_label if raw_label in VALID_INTENTS else "unknown"
+        return raw_label if raw_label in VALID_INTENTS else "unknown"
     except Exception as e:
         logger.exception("LLM intent classification failed")
-        # fallback simple keyword heuristics as safety-net:
-        ui = state.get("user_input", "").lower()
-        if "transfer" in ui or "send" in ui:
-            state["intent"] = "transfer"
-        elif "spend" in ui or "transactions" in ui:
-            state["intent"] = "spend"
-        elif "offer" in ui or "discount" in ui:
-            state["intent"] = "offers"
-        elif "how" in ui or "what" in ui or "faq" in ui:
-            state["intent"] = "faq"
+        # Fallback to simple keyword heuristics
+        if "transfer" in user_input or "send" in user_input:
+            return "transfer"
+        elif "spend" in user_input or "transactions" in user_input:
+            return "spend"
+        elif "offer" in user_input or "discount" in user_input:
+            return "offers"
+        elif "how" in user_input or "what" in user_input or "faq" in user_input:
+            return "faq"
         else:
-            state["intent"] = "unknown"
-    return state
+            return "unknown"
 
 # ---------- Handlers ----------
 def spends_node(state: AgentState) -> AgentState:
@@ -700,7 +200,7 @@ def transfer_node(state: AgentState) -> AgentState:
     state["result"] = transfer_result or {}
 
     if isinstance(transfer_result, dict) and transfer_result.get("status") == "otp_required":
-        # transfer_details should be returned as dict by handle_transfer — if string, try to parse
+        # transfer_details should be returned as dict by handle_transfer â€” if string, try to parse
         parsed = transfer_result.get("transfer_details", {})
         if isinstance(parsed, str):
             try:
@@ -820,6 +320,54 @@ def confirmation_node(state: AgentState) -> AgentState:
         })
     return state
 
+# ---------- Interruption Confirmation Node ----------
+def interruption_confirmation_node(state: AgentState) -> AgentState:
+    """Handles the interruption confirmation flow."""
+    ensure_state_defaults(state)
+    user_input = state.get("user_input", "").lower().strip()
+    interrupted_state = state.get("interrupted_state")
+
+    if user_input == "yes":
+        # User wants to abandon the old task and start the new one.
+        # The new intent is stored in the interrupted_state.
+        new_intent = interrupted_state.get("new_intent", "unknown")
+        state["intent"] = new_intent
+        state["phase"] = ConversationPhase.NORMAL
+        # Clear all context from the interrupted task
+        state["pending_transfer"] = None
+        state["confirmation_context"] = None
+        state["otp_attempts"] = 0
+        state["interrupted_state"] = None
+        # The graph will now route to the node for the `new_intent`.
+        # We don't set a result here, as the next node will do it.
+
+    elif user_input == "no":
+        # User wants to continue the old task.
+        # Restore the previous phase and context.
+        state["phase"] = to_phase(interrupted_state.get("phase"))
+        state["intent"] = str(state["phase"]) # intent should match the phase, e.g., "otp"
+        state["pending_transfer"] = interrupted_state.get("pending_transfer")
+        state["confirmation_context"] = interrupted_state.get("confirmation_context")
+        state["otp_attempts"] = interrupted_state.get("otp_attempts", 0)
+        state["interrupted_state"] = None
+        # Provide a message to guide the user back to the task
+        if state["phase"] == ConversationPhase.OTP:
+            state["result"] = "Ok, let's continue with the transfer. Please provide the OTP."
+        elif state["phase"] == ConversationPhase.CONFIRMATION:
+            state["result"] = "Alright, let's continue. Please reply with 'yes' or 'no' to the recommendation."
+        else: # Fallback
+            state["result"] = "Resuming your previous action."
+
+    else:
+        # The user's response was not a clear 'yes' or 'no'.
+        # Re-prompt for confirmation.
+        state["result"] = "Please answer with 'yes' to start a new task or 'no' to continue with the current one."
+        # Keep the phase as INTERRUPTION_CONFIRMATION so this node is hit again
+        state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
+        state["intent"] = "interruption_confirmation"
+
+    return state
+
 # ---------- Unknown Node ----------
 def unknown_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
@@ -830,6 +378,7 @@ def unknown_node(state: AgentState) -> AgentState:
 def build_flow():
     workflow = StateGraph(AgentState)
 
+    # --- Add Nodes ---
     workflow.add_node("classify_intent", classify_intent)
     workflow.add_node("spend", spends_node)
     workflow.add_node("faq", faq_node)
@@ -837,10 +386,13 @@ def build_flow():
     workflow.add_node("transfer", transfer_node)
     workflow.add_node("otp", otp_node)
     workflow.add_node("confirmation", confirmation_node)
+    workflow.add_node("interruption_confirmation", interruption_confirmation_node)
     workflow.add_node("unknown", unknown_node)
 
+    # --- Add Edges ---
     workflow.set_entry_point("classify_intent")
 
+    # This is the main router of the graph
     workflow.add_conditional_edges(
         "classify_intent",
         lambda state: state.get("intent", "unknown"),
@@ -851,10 +403,15 @@ def build_flow():
             "transfer": "transfer",
             "otp": "otp",
             "confirmation": "confirmation",
+            "interruption_confirmation": "interruption_confirmation",
             "unknown": "unknown",
         },
     )
 
+    # After handling an interruption, the graph should re-evaluate the new state
+    workflow.add_edge("interruption_confirmation", "classify_intent")
+
+    # All other terminal nodes end the flow for the current turn
     for node in ["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]:
         workflow.add_edge(node, END)
 
