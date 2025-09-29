@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import '../models/chat_message.dart';
+import 'package:flutter_frontend_app/models/message.dart';
 
 class BotMessageBubble extends StatelessWidget {
-  final BotMessage message;
+  final Message message;
 
   const BotMessageBubble({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    // If structured message exists
-    if (message.title != null) {
+    if (message.data != null && message.data!['title'] != null) {
+      final data = message.data!;
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 8),
         child: Padding(
@@ -17,29 +17,30 @@ class BotMessageBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(message.title!, style: const TextStyle(fontWeight: FontWeight.bold)),
-              if (message.totalSpent != null)
-                Text("Total Spent: ₹${message.totalSpent!.toStringAsFixed(0)}"),
-              if (message.breakdown != null)
-                ...message.breakdown!.entries
-                    .map((e) => Text("${e.key}: ₹${e.value.toStringAsFixed(0)}"))
+              Text(data['title']!,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              if (data['totalSpent'] != null)
+                Text(
+                    "Total Spent: ₹${(data['totalSpent'] as num).toStringAsFixed(0)}"),
+              if (data['breakdown'] != null && data['breakdown'] is Map)
+                ...(data['breakdown'] as Map<String, dynamic>)
+                    .entries
+                    .map((e) => Text(
+                        "${e.key}: ₹${(e.value as num).toStringAsFixed(0)}"))
                     .toList(),
-              if (message.spendingTrend != null)
-                Text("Trend: ${message.spendingTrend!}"),
-              if (message.summary != null)
-                Text("Summary: ${message.summary!}"),
+              if (data['spendingTrend'] != null)
+                Text("Trend: ${data['spendingTrend']!}"),
+              if (data['summary'] != null) Text("Summary: ${data['summary']!}"),
             ],
           ),
         ),
       );
     }
-
-    // Otherwise show text-only
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Text(message.text ?? ""),
+        child: Text(message.text),
       ),
     );
   }
