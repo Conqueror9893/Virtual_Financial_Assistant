@@ -19,7 +19,7 @@ class BotAvatarGreeting extends StatelessWidget {
                 ? AssetImage(displayData.avatarAssetPath!)
                 : null,
             child: displayData.avatarAssetPath == null
-                ? Icon(Icons.android, size: 40, color: Colors.white)
+                ? const Icon(Icons.android, size: 40, color: Colors.white)
                 : null,
           ),
         ),

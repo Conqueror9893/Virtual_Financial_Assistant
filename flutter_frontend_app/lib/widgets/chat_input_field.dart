@@ -14,7 +14,7 @@ class ChatInputField extends StatefulWidget {
 
 class _ChatInputFieldState extends State<ChatInputField> {
   final TextEditingController _controller = TextEditingController();
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   void _sendMessage() {
     final text = _controller.text.trim();
