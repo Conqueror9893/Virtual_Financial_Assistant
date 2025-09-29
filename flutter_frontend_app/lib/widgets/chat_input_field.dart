@@ -4,7 +4,9 @@ import 'package:http/http.dart' as http;
 
 class ChatInputField extends StatefulWidget {
   final String hintText;
-  const ChatInputField({super.key, required this.hintText});
+  final Function(String) onSendMessage;
+  const ChatInputField(
+      {super.key, required this.hintText, required this.onSendMessage});
 
   @override
   State<ChatInputField> createState() => _ChatInputFieldState();
@@ -12,37 +14,13 @@ class ChatInputField extends StatefulWidget {
 
 class _ChatInputFieldState extends State<ChatInputField> {
   final TextEditingController _controller = TextEditingController();
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
-  Future<void> _sendMessage() async {
+  void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final response = await http.post(
-        Uri.parse("http://10.32.2.151:3009/chatbot"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "user_id": 1,
-          "query": text,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint("Bot response: $data");
-        // TODO: Hook this into your chat UI instead of just printing
-      } else {
-        debugPrint("Error: ${response.statusCode} ${response.body}");
-      }
-    } catch (e) {
-      debugPrint("Exception: $e");
-    } finally {
-      setState(() => _isLoading = false);
-      _controller.clear();
-    }
+    widget.onSendMessage(text);
+    _controller.clear();
   }
 
   @override

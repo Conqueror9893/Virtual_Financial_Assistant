@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import 'package:flutter_frontend_app/main.dart';
 import 'package:flutter_frontend_app/screens/ai_bot_screen.dart';
 import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
 
