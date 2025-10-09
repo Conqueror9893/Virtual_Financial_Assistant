@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 from functools import lru_cache
 
+from utils import logger
+
+logger = logger.get_logger("SpendInsightsTool")
 EXCEL_PATH = "data/transactions.xlsx"
 
 @lru_cache(maxsize=1)
@@ -28,18 +31,19 @@ def filter_transactions(start_date=None, end_date=None, category=None, merchant=
 
 def get_total_spend(start_date=None, end_date=None):
     df = filter_transactions(start_date, end_date)
-    return df["amount"].sum()
+    logger.info("Total transactions found: %d", len(df["TXN_AMOUNT_LCY"]))
+    return df["TXN_AMOUNT_LCY"].sum()
 
 def get_category_spend(category, start_date=None, end_date=None):
     df = filter_transactions(start_date, end_date, category)
-    return df["amount"].sum()
+    return df["TXN_AMOUNT_LCY"].sum()
 
 def get_top_merchants(category=None, start_date=None, end_date=None, limit=5):
     df = filter_transactions(start_date, end_date, category)
-    grouped = df.groupby("genify_clean_description")["amount"].sum().reset_index()
-    return grouped.sort_values("amount", ascending=False).head(limit).to_dict(orient="records")
+    grouped = df.groupby("genify_clean_description")["TXN_AMOUNT_LCY"].sum().reset_index()
+    return grouped.sort_values("TXN_AMOUNT_LCY", ascending=False).head(limit).to_dict(orient="records")
 
 def get_spend_breakdown(start_date=None, end_date=None):
     df = filter_transactions(start_date, end_date)
-    grouped = df.groupby("genify_category")["amount"].sum().reset_index()
+    grouped = df.groupby("genify_category")["TXN_AMOUNT_LCY"].sum().reset_index()
     return grouped.to_dict(orient="records")

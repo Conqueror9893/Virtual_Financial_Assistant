@@ -1,4 +1,3 @@
-
 # langraph_flow/langraph_flow.py
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Literal, Optional, Dict, Any
@@ -20,6 +19,7 @@ if not logger:
     logger = logging.getLogger("LangGraphFlow")
     logging.basicConfig(level=logging.INFO)
 
+
 # ---------- Conversation Phase Enum ----------
 class ConversationPhase(str, Enum):
     NORMAL = "normal"
@@ -27,10 +27,20 @@ class ConversationPhase(str, Enum):
     CONFIRMATION = "confirmation"
     INTERRUPTION_CONFIRMATION = "interruption_confirmation"
 
+
 # ---------- State Definition ----------
 class AgentState(TypedDict, total=False):
     user_input: str
-    intent: Literal["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown", "interruption_confirmation"]
+    intent: Literal[
+        "spend",
+        "faq",
+        "offers",
+        "transfer",
+        "otp",
+        "confirmation",
+        "unknown",
+        "interruption_confirmation",
+    ]
     result: Any
     phase: ConversationPhase
     otp_attempts: int
@@ -39,11 +49,13 @@ class AgentState(TypedDict, total=False):
     user_id: str
     interrupted_state: Optional[Dict]
 
+
 # ---------- Helpers ----------
 VALID_INTENTS = {"spend", "faq", "offers", "transfer"}
 CONFIRMATION_HANDLERS = {
     "confirm_recommendation": confirm_recommendation,
 }
+
 
 def to_phase(value: Any) -> ConversationPhase:
     """Normalize phase whether it's a string or ConversationPhase."""
@@ -57,6 +69,7 @@ def to_phase(value: Any) -> ConversationPhase:
             return ConversationPhase.CONFIRMATION
         return ConversationPhase.NORMAL
     return ConversationPhase.NORMAL
+
 
 def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
     """Make sure required keys exist with sane defaults. Mutates and returns state."""
@@ -77,6 +90,7 @@ def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
     state.setdefault("user_id", str(state.get("user_id", "1")))
     return state
 
+
 def run_handler(state: AgentState, handler_fn) -> AgentState:
     user_id = state.get("user_id", "0")
     try:
@@ -85,6 +99,7 @@ def run_handler(state: AgentState, handler_fn) -> AgentState:
         logger.exception("Handler %s raised an exception", handler_fn.__name__)
         state["result"] = {"status": "error", "message": str(e)}
     return state
+
 
 # ---------- Intent Classification Node ----------
 def classify_intent(state: AgentState) -> AgentState:
@@ -115,7 +130,7 @@ def classify_intent(state: AgentState) -> AgentState:
                 "pending_transfer": state.get("pending_transfer"),
                 "confirmation_context": state.get("confirmation_context"),
                 "otp_attempts": state.get("otp_attempts"),
-                "new_intent": new_intent, # Store the intent of the interrupting query
+                "new_intent": new_intent,  # Store the intent of the interrupting query
             }
             return state
         # If the new intent is "unknown", treat it as irrelevant input for the current phase
@@ -130,10 +145,11 @@ def classify_intent(state: AgentState) -> AgentState:
         state["intent"] = "confirmation"
     elif phase == ConversationPhase.NORMAL:
         state["intent"] = classify_new_query(user_input)
-    else: # Should not happen, but as a fallback
+    else:  # Should not happen, but as a fallback
         state["intent"] = "unknown"
 
     return state
+
 
 def classify_new_query(user_input: str) -> str:
     """
@@ -163,18 +179,22 @@ def classify_new_query(user_input: str) -> str:
         else:
             return "unknown"
 
+
 # ---------- Handlers ----------
 def spends_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     return run_handler(state, handle_spend_insight)
 
+
 def faq_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     return run_handler(state, handle_faq)
 
+
 def offers_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     return run_handler(state, handle_offers)
+
 
 def transfer_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
@@ -182,9 +202,15 @@ def transfer_node(state: AgentState) -> AgentState:
     user_input_str = (state.get("user_input") or "").strip()
 
     # If we're already in OTP phase and someone routes digits here, redirect
-    if to_phase(state.get("phase")) == ConversationPhase.OTP and user_input_str.isdigit():
+    if (
+        to_phase(state.get("phase")) == ConversationPhase.OTP
+        and user_input_str.isdigit()
+    ):
         state["intent"] = "otp"
-        state["result"] = {"status": "error", "message": "Redirecting input to OTP validation."}
+        state["result"] = {
+            "status": "error",
+            "message": "Redirecting input to OTP validation.",
+        }
         return state
 
     try:
@@ -199,14 +225,19 @@ def transfer_node(state: AgentState) -> AgentState:
 
     state["result"] = transfer_result or {}
 
-    if isinstance(transfer_result, dict) and transfer_result.get("status") == "otp_required":
+    if (
+        isinstance(transfer_result, dict)
+        and transfer_result.get("status") == "otp_required"
+    ):
         # transfer_details should be returned as dict by handle_transfer â€” if string, try to parse
         parsed = transfer_result.get("transfer_details", {})
         if isinstance(parsed, str):
             try:
                 parsed = json.loads(parsed)
             except Exception:
-                logger.warning("transfer_details was a string and failed JSON parse; keeping raw")
+                logger.warning(
+                    "transfer_details was a string and failed JSON parse; keeping raw"
+                )
                 # keep as-is
         state["phase"] = ConversationPhase.OTP
         state["pending_transfer"] = parsed or {}
@@ -218,6 +249,7 @@ def transfer_node(state: AgentState) -> AgentState:
 
     return state
 
+
 # ---------- OTP Node ----------
 def otp_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
@@ -226,52 +258,73 @@ def otp_node(state: AgentState) -> AgentState:
     details = state.get("pending_transfer") or {}
 
     if not details:
-        state.update({
-            "result": {"status": "error", "message": "No pending transfer found for OTP. Please restart transfer."},
-            "phase": ConversationPhase.NORMAL,
-            "otp_attempts": 0,
-            "pending_transfer": None,
-        })
+        state.update(
+            {
+                "result": {
+                    "status": "error",
+                    "message": "No pending transfer found for OTP. Please restart transfer.",
+                },
+                "phase": ConversationPhase.NORMAL,
+                "otp_attempts": 0,
+                "pending_transfer": None,
+            }
+        )
         return state
 
     try:
         transfer_result = handle_transfer(user_id, details, otp)
     except Exception as e:
         logger.exception("handle_transfer (OTP validation) raised")
-        state.update({
-            "result": {"status": "error", "message": str(e)},
-            "phase": ConversationPhase.NORMAL,
-            "otp_attempts": 0,
-            "pending_transfer": None,
-        })
+        state.update(
+            {
+                "result": {"status": "error", "message": str(e)},
+                "phase": ConversationPhase.NORMAL,
+                "otp_attempts": 0,
+                "pending_transfer": None,
+            }
+        )
         return state
 
     if transfer_result.get("status") == "otp_incorrect":
         state["otp_attempts"] = int(state.get("otp_attempts", 0)) + 1
         if state["otp_attempts"] >= 3:
-            state.update({
-                "result": {"status": "failed", "message": "Maximum OTP attempts reached. Transfer cancelled."},
-                "phase": ConversationPhase.NORMAL,
-                "pending_transfer": None,
-                "otp_attempts": 0,
-            })
+            state.update(
+                {
+                    "result": {
+                        "status": "failed",
+                        "message": "Maximum OTP attempts reached. Transfer cancelled.",
+                    },
+                    "phase": ConversationPhase.NORMAL,
+                    "pending_transfer": None,
+                    "otp_attempts": 0,
+                }
+            )
         else:
             remaining = 3 - state["otp_attempts"]
-            state.update({
-                "result": {"status": "error", "message": f"Incorrect OTP. {remaining} attempt(s) left."},
-                "phase": ConversationPhase.OTP,
-            })
+            state.update(
+                {
+                    "result": {
+                        "status": "error",
+                        "message": f"Incorrect OTP. {remaining} attempt(s) left.",
+                    },
+                    "phase": ConversationPhase.OTP,
+                }
+            )
         return state
 
     # OTP validated (or other final result)
-    state.update({
-        "result": transfer_result,
-        "phase": ConversationPhase.NORMAL,
-        "pending_transfer": None,
-        "otp_attempts": 0,
-    })
+    state.update(
+        {
+            "result": transfer_result,
+            "phase": ConversationPhase.NORMAL,
+            "pending_transfer": None,
+            "otp_attempts": 0,
+        }
+    )
 
-    if transfer_result.get("status") == "success" and transfer_result.get("recommendation"):
+    if transfer_result.get("status") == "success" and transfer_result.get(
+        "recommendation"
+    ):
         state["phase"] = ConversationPhase.CONFIRMATION
         state["confirmation_context"] = {
             "action": "confirm_recommendation",
@@ -282,43 +335,81 @@ def otp_node(state: AgentState) -> AgentState:
 
     return state
 
+
+def normalize_confirmation_input(inp: str) -> str:
+    val = (inp or "").strip().lower()
+    if val in ("confirm_yes", "confirm-yes", "y", "yes"):
+        return "yes"
+    if val in ("confirm_no", "confirm-no", "n", "no"):
+        return "no"
+    return val
+
+
 # ---------- Confirmation Node ----------
 def confirmation_node(state: AgentState) -> AgentState:
+    """
+    Handles confirmation phase - e.g. user replies 'yes' or 'no' to proceed.
+    Normalizes inputs like CONFIRM_YES/CONFIRM_NO to expected format.
+    """
     ensure_state_defaults(state)
+
+    # Only handle confirmation if we're actually in that phase
     if to_phase(state.get("phase")) != ConversationPhase.CONFIRMATION:
         state["result"] = "No pending confirmation. How can I assist you?"
         return state
 
-    ctx = state.get("confirmation_context") or {}
-    action, details = ctx.get("action"), ctx.get("details", {})
-    handler = CONFIRMATION_HANDLERS.get(action)
+    user_input = normalize_confirmation_input(state.get("user_input"))
+    state["user_input"] = user_input
 
-    if handler:
-        try:
-            result = handler(
-                details.get("beneficiary_id"),
-                details.get("recommendation_id"),
-                {"user_id": state.get("user_id", "1"), "query": state.get("user_input", "")}
-            )
-            state.update({
+
+    # --- Retrieve context of what's being confirmed ---
+    ctx = state.get("confirmation_context") or {}
+    action = ctx.get("action")
+    details = ctx.get("details", {})
+
+    handler = CONFIRMATION_HANDLERS.get(action)
+    if not handler:
+        state.update(
+            {
+                "result": "Unexpected confirmation request.",
+                "phase": ConversationPhase.NORMAL,
+                "confirmation_context": None,
+            }
+        )
+        return state
+
+    # --- Execute confirmation handler ---
+    try:
+        result = handler(
+            details.get("beneficiary_id"),
+            details.get("recommendation_id"),
+            {
+                "user_id": state.get("user_id", "1"),
+                "query": state["user_input"],  # normalized yes/no
+            },
+        )
+
+        # reset confirmation phase after handling
+        state.update(
+            {
                 "result": result,
                 "phase": ConversationPhase.NORMAL,
                 "confirmation_context": None,
-            })
-        except Exception as e:
-            logger.exception("confirm handler failed")
-            state.update({
+            }
+        )
+
+    except Exception as e:
+        logger.exception("Error handling confirmation")
+        state.update(
+            {
                 "result": {"status": "error", "message": str(e)},
                 "phase": ConversationPhase.NORMAL,
                 "confirmation_context": None,
-            })
-    else:
-        state.update({
-            "result": "Unexpected confirmation request.",
-            "phase": ConversationPhase.NORMAL,
-            "confirmation_context": None,
-        })
+            }
+        )
+
     return state
+
 
 # ---------- Interruption Confirmation Node ----------
 def interruption_confirmation_node(state: AgentState) -> AgentState:
@@ -345,34 +436,44 @@ def interruption_confirmation_node(state: AgentState) -> AgentState:
         # User wants to continue the old task.
         # Restore the previous phase and context.
         state["phase"] = to_phase(interrupted_state.get("phase"))
-        state["intent"] = str(state["phase"]) # intent should match the phase, e.g., "otp"
+        state["intent"] = str(
+            state["phase"]
+        )  # intent should match the phase, e.g., "otp"
         state["pending_transfer"] = interrupted_state.get("pending_transfer")
         state["confirmation_context"] = interrupted_state.get("confirmation_context")
         state["otp_attempts"] = interrupted_state.get("otp_attempts", 0)
         state["interrupted_state"] = None
         # Provide a message to guide the user back to the task
         if state["phase"] == ConversationPhase.OTP:
-            state["result"] = "Ok, let's continue with the transfer. Please provide the OTP."
+            state["result"] = (
+                "Ok, let's continue with the transfer. Please provide the OTP."
+            )
         elif state["phase"] == ConversationPhase.CONFIRMATION:
-            state["result"] = "Alright, let's continue. Please reply with 'yes' or 'no' to the recommendation."
-        else: # Fallback
+            state["result"] = (
+                "Alright, let's continue. Please reply with 'yes' or 'no' to the recommendation."
+            )
+        else:  # Fallback
             state["result"] = "Resuming your previous action."
 
     else:
         # The user's response was not a clear 'yes' or 'no'.
         # Re-prompt for confirmation.
-        state["result"] = "Please answer with 'yes' to start a new task or 'no' to continue with the current one."
+        state["result"] = (
+            "Please answer with 'yes' to start a new task or 'no' to continue with the current one."
+        )
         # Keep the phase as INTERRUPTION_CONFIRMATION so this node is hit again
         state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
         state["intent"] = "interruption_confirmation"
 
     return state
 
+
 # ---------- Unknown Node ----------
 def unknown_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     state["result"] = "Sorry, I didn't understand your request. Could you rephrase?"
     return state
+
 
 # ---------- Flow Builder ----------
 def build_flow():
@@ -412,10 +513,19 @@ def build_flow():
     workflow.add_edge("interruption_confirmation", "classify_intent")
 
     # All other terminal nodes end the flow for the current turn
-    for node in ["spend", "faq", "offers", "transfer", "otp", "confirmation", "unknown"]:
+    for node in [
+        "spend",
+        "faq",
+        "offers",
+        "transfer",
+        "otp",
+        "confirmation",
+        "unknown",
+    ]:
         workflow.add_edge(node, END)
 
     return workflow.compile()
+
 
 # ---------- CLI Runner ----------
 if __name__ == "__main__":
