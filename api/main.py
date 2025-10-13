@@ -5,7 +5,7 @@ from threading import Lock
 import requests
 import json
 from langgraph_flow.nodes.spend_insights_node import handle_spend_insight
-from langgraph_flow.nodes.output_formatter import format_spend_response
+from utils.output_formatter import format_spend_response
 from langgraph_flow.nodes.faq_node import handle_faq
 from langgraph_flow.nodes.offers_node import handle_offers
 from langgraph_flow.nodes.transfer_node import handle_transfer
@@ -85,7 +85,7 @@ Your task:
 3. Avoid exposing internal keys or JSON formatting.
 4. Keep the tone polite and human, suitable for an in-app chatbot.
 
-Currency is INR. Use the same currency in your response.
+Currency is USD. Use the same currency in your response.
 Do not start the response with "As an AI language model" or with greetings like "Hi" or "Hello". Also do not with "Best regards".
 """
 
@@ -340,8 +340,10 @@ def handle_normal_phase(user_id, user_state, query, otp):
         return jsonify({"status": "error", "message": f"Service call failed: {e}"}), 500
 
     inner_resp = resp.get("response") if isinstance(resp.get("response"), dict) else resp
+    spend_structured_summary = inner_resp.get("raw") if isinstance(inner_resp.get("raw"), dict) else None
     status = inner_resp.get("status")
 
+    # Phase updates
     if status == "otp_required":
         user_state["phase"] = ConversationPhase.OTP
         user_state["pending_transfer"] = inner_resp.get("transfer_details")
@@ -357,9 +359,17 @@ def handle_normal_phase(user_id, user_state, query, otp):
         user_state["confirmation_context"] = None
 
     save_user_state(user_id, user_state)
+
     user_query_for_llm = query or otp or ""
-    chat_reply = llm_format_chat_response(inner_resp, user_query_for_llm)
+
+    # Skip LLM formatting for spend intent (it's already well formatted)
+    if intent == "spends_check":
+        chat_reply = spend_structured_summary.get("structured_summary") or spend_structured_summary if isinstance(spend_structured_summary, dict) else inner_resp
+    else:
+        chat_reply = llm_format_chat_response(inner_resp, user_query_for_llm)
+
     return jsonify({"status": "ok", "response": chat_reply})
+
 
 def dispatch_intent(intent, user_id, query, otp):
     if intent == "fund_transfer":

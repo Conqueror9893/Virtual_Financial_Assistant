@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_frontend_app/widgets/spending_summary_bubble.dart';
 import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../widgets/transfer_form.dart';
+import '../utils/logger.dart';
+
+final logger = Logger("BotMessageBubble");
 
 class BotMessageBubble extends StatefulWidget {
   final BotMessage message;
@@ -22,12 +26,15 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
   @override
   Widget build(BuildContext context) {
     final message = widget.message;
-
+    print(
+        "[INFO][BotMessageBubble] Rendering bot message: ${message.text}, extraData: ${message.extraData}");
     // 🧾 Transfer form inline
     if (message.text == "[SHOW_TRANSFER_FORM_BUTTON]") {
       final extra = message.extraData ?? {};
-      final beneficiaryName = extra["beneficiary_name"]?.toString() ?? "Beneficiary";
-      final initialAmount = (extra["amount"] is num) ? extra["amount"] * 1.0 : 5000.0;
+      final beneficiaryName =
+          extra["beneficiary_name"]?.toString() ?? "Beneficiary";
+      final initialAmount =
+          (extra["amount"] is num) ? extra["amount"] * 1.0 : 5000.0;
 
       // store name locally
       _beneficiaryName ??= beneficiaryName;
@@ -87,6 +94,11 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
       );
     }
 
+    if (message.text == "[SPEND_INSIGHTS_SUMMARY]" &&
+        message.extraData != null) {
+      return SpendingSummaryBubble(data: message.extraData!);
+    }
+
     // Default bot message handling...
     if (message.title != null) {
       return Card(
@@ -101,15 +113,14 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               if (message.totalSpent != null)
-                Text("Total Spent: ₹${message.totalSpent!.toStringAsFixed(0)}"),
+                Text("Total Spent: ${message.totalSpent!.toStringAsFixed(0)}"),
               if (message.breakdown != null)
                 ...message.breakdown!.entries.map(
-                  (e) => Text("${e.key}: ₹${e.value.toStringAsFixed(0)}"),
+                  (e) => Text("${e.key}: ${e.value.toStringAsFixed(0)}"),
                 ),
               if (message.spendingTrend != null)
                 Text("Trend: ${message.spendingTrend!}"),
-              if (message.summary != null)
-                Text("Summary: ${message.summary!}"),
+              if (message.summary != null) Text("Summary: ${message.summary!}"),
             ],
           ),
         ),

@@ -9,9 +9,11 @@ import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
 import 'package:flutter_frontend_app/models/chat_message.dart';
 import 'package:flutter_frontend_app/widgets/user_message_bubble.dart';
 import 'package:flutter_frontend_app/widgets/bot_message_bubble.dart';
-import 'package:flutter_frontend_app/widgets/transfer_form.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/logger.dart';
+
+final logger = Logger("AiBotScreen");
 
 class AiBotScreen extends StatefulWidget {
   final AiDisplayData displayData;
@@ -126,9 +128,15 @@ class _AiBotScreenState extends State<AiBotScreen> {
   void _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
+    // 🩵 Detect OTP (e.g. 4-8 digits)
+    final isOtp = RegExp(r'^\d{4,8}$').hasMatch(text.trim());
+
+    // 🧠 Mask OTP for UI only
+    final displayText = isOtp ? '*' * text.trim().length : text.trim();
+
     final userMessage = UserMessage(
       id: DateTime.now().toIso8601String(),
-      text: text.trim(),
+      text: displayText, // 👈 Masked for frontend
     );
 
     setState(() {
@@ -139,6 +147,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
     _scrollToBottom();
 
     try {
+      // ✅ Send actual OTP (not masked) to backend
       final response = await http.post(
         Uri.parse('http://10.32.2.151:3009/chatbot'),
         headers: {'Content-Type': 'application/json'},
@@ -148,13 +157,13 @@ class _AiBotScreenState extends State<AiBotScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // 🧠 Flatten nested structure
+        // Flatten bot response
         final botResponse = data['response'] is Map
             ? (data['response']['response'] ?? data['response'])
             : data['response'];
 
         if (botResponse is String) {
-          // 🩵 FIX: Wrap this in setState
+          // Simple text
           setState(() {
             _messages.add(BotMessage(
               id: DateTime.now().toIso8601String(),
@@ -166,7 +175,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
           final recommendation = botResponse['recommendation']?.toString();
           final showForm = botResponse['show_transfer_form'] == true;
 
-          // 1️⃣ Add main message
+          // Normal text message
           if (message.isNotEmpty) {
             setState(() {
               _messages.add(BotMessage(
@@ -176,7 +185,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
             });
           }
 
-          // 2️⃣ Add recommendation as a separate bubble
+          // Recommendation
           if (recommendation != null && recommendation.isNotEmpty) {
             setState(() {
               _messages.add(BotMessage(
@@ -188,8 +197,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
               ));
             });
           }
-
-          // 3️⃣ Add transfer form bubble if required
+          // Transfer form
           if (showForm) {
             final beneficiary =
                 botResponse['beneficiary_name']?.toString() ?? '';
@@ -203,6 +211,29 @@ class _AiBotScreenState extends State<AiBotScreen> {
                 extraData: {
                   "beneficiary_name": beneficiary,
                   "amount": amount,
+                },
+              ));
+            });
+          }
+          logger.info("Bot response received: $botResponse");
+          // Spend insights handling (structured summary)
+          if (botResponse['breakdown_merchants'] != null )  {
+            logger.info("Adding spend insights summary: ${botResponse['response']}");
+          }
+          if (botResponse != null) {
+            final summary = botResponse;
+            logger.info("Adding spend insights summary: $summary");
+
+            setState(() {
+              _messages.add(BotMessage(
+                id: "spend_summary_${DateTime.now().toIso8601String()}",
+                text: "[SPEND_INSIGHTS_SUMMARY]",
+                extraData: {
+                  "summary_title": summary["summary_title"],
+                  "total_spent": summary["total_spent"],
+                  "chart_data": summary["chart_data"],
+                  "breakdown_merchants": summary["breakdown_merchants"],
+                  "trend_insights": summary["trend_insights"],
                 },
               ));
             });
