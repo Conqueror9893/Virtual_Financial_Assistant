@@ -1,4 +1,135 @@
-///lib/screens/ai_bot_screen.dart
+// import 'package:flutter/material.dart';
+// import 'package:flutter_frontend_app/widgets/custom_app_bar.dart';
+// import 'package:flutter_frontend_app/widgets/bot_avatar_greeting.dart';
+// import 'package:flutter_frontend_app/widgets/suggestion_chips.dart';
+// import 'package:flutter_frontend_app/widgets/chat_input_field.dart';
+// import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
+// import 'package:flutter_frontend_app/models/chat_message.dart';
+// import 'package:flutter_frontend_app/widgets/user_message_bubble.dart';
+// import 'package:flutter_frontend_app/widgets/bot_message_bubble.dart';
+
+// class AiBotScreen extends StatefulWidget {
+//   final AiDisplayData displayData;
+//   const AiBotScreen({super.key, required this.displayData});
+
+//   @override
+//   State<AiBotScreen> createState() => _AiBotScreenState();
+// }
+
+// class _AiBotScreenState extends State<AiBotScreen> {
+//   final List<ChatMessage> _messages = [];
+
+//   @override
+//   Widget build(BuildContext context) {
+//     const double fixedWidth = 390;
+//     const double fixedHeight = 844;
+
+//     return LayoutBuilder(builder: (context, constraints) {
+//       return Stack(
+//         children: [
+//           Positioned(
+//             right: 16,
+//             bottom: 16,
+//             child: ConstrainedBox(
+//               constraints: BoxConstraints(
+//                 maxWidth: constraints.maxWidth * 0.9,
+//                 maxHeight: constraints.maxHeight * 0.9,
+//               ),
+//               child: FittedBox(
+//                 alignment: Alignment.bottomRight,
+//                 fit: BoxFit.contain,
+//                 child: SizedBox(
+//                   width: fixedWidth,
+//                   height: fixedHeight,
+//                   child: Material(
+//                     elevation: 8,
+//                     borderRadius: BorderRadius.circular(16),
+//                     clipBehavior: Clip.hardEdge,
+//                     child: _buildChatContainer(),
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ),
+//         ],
+//       );
+//     });
+//   }
+
+//   Widget _buildChatContainer() {
+//     return Scaffold(
+//       extendBodyBehindAppBar: true,
+//       appBar: CustomAppBar(title: widget.displayData.title),
+//       body: Container(
+//         decoration: BoxDecoration(
+//           gradient: LinearGradient(
+//             colors: widget.displayData.backgroundGradient,
+//             begin: Alignment.topCenter,
+//             end: Alignment.bottomCenter,
+//             stops: const [0.0, 0.33],
+//           ),
+//         ),
+//         child: SafeArea(
+//           child: Column(
+//             children: [
+//               Expanded(
+//                 child: ListView.builder(
+//                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
+//                   itemCount: _messages.length,
+//                   itemBuilder: (context, index) {
+//                     final message = _messages[index];
+//                     if (message is UserMessage) {
+//                       return UserMessageBubble(text: message.text);
+//                     }
+//                     if (message is BotMessage) {
+//                       return BotMessageBubble(message: message);
+//                     }
+//                     return const SizedBox.shrink();
+//                   },
+//                 ),
+//               ),
+//               ChatInputField(
+//                 hintText: widget.displayData.inputHint,
+//                 onSendMessage: _sendMessage,
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   void _sendMessage(String text) {
+//     final userMessage = UserMessage(id: DateTime.now().toString(), text: text);
+//     setState(() {
+//       _messages.add(userMessage);
+//     });
+
+//     // Simulate a bot response
+//     Future.delayed(const Duration(seconds: 1), () {
+//       final botMessage = BotMessage(
+//         id: DateTime.now().toString(),
+//         title: 'Monthly spending summary - August 2025',
+//         totalSpent: 82450,
+//         breakdown: {
+//           'Rent': 25000,
+//           'Groceries': 12500,
+//           'Transport': 6800,
+//           'Dining & Food': 5600,
+//           'Internet': 1450,
+//           'Health': 4500,
+//           'EMI': 15400,
+//         },
+//         spendingTrend:
+//             'Paid: ₹4,850 more than July\nMost spent on: Rent\nMost frequent purchases: Groceries',
+//         summary: 'Summarise',
+//       );
+//       setState(() {
+//         _messages.add(botMessage);
+//       });
+//     });
+//   }
+// }
 
 import 'package:flutter/material.dart';
 import 'package:flutter_frontend_app/widgets/custom_app_bar.dart';
@@ -11,9 +142,6 @@ import 'package:flutter_frontend_app/widgets/user_message_bubble.dart';
 import 'package:flutter_frontend_app/widgets/bot_message_bubble.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../utils/logger.dart';
-
-final logger = Logger("AiBotScreen");
 
 class AiBotScreen extends StatefulWidget {
   final AiDisplayData displayData;
@@ -25,8 +153,6 @@ class AiBotScreen extends StatefulWidget {
 
 class _AiBotScreenState extends State<AiBotScreen> {
   final List<ChatMessage> _messages = [];
-  final ScrollController _scrollController = ScrollController();
-  bool _showGreeting = true;
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +209,11 @@ class _AiBotScreenState extends State<AiBotScreen> {
             children: [
               Expanded(
                 child: ListView.builder(
-                  controller: _scrollController,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 24.0, vertical: 16),
-                  itemCount:
-                      _showGreeting ? _messages.length + 1 : _messages.length,
+                  itemCount: _messages.length + 1,
                   itemBuilder: (context, index) {
-                    if (_showGreeting && index == 0) {
+                    if (index == 0) {
                       // Show avatar greeting and suggestion chips at top
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -103,8 +227,8 @@ class _AiBotScreenState extends State<AiBotScreen> {
                         ],
                       );
                     }
-                    final message =
-                        _messages[_showGreeting ? index - 1 : index];
+
+                    final message = _messages[index - 1];
                     if (message is UserMessage) {
                       return UserMessageBubble(text: message.text);
                     } else if (message is BotMessage) {
@@ -126,152 +250,52 @@ class _AiBotScreenState extends State<AiBotScreen> {
   }
 
   void _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-
-    // 🩵 Detect OTP (e.g. 4-8 digits)
-    final isOtp = RegExp(r'^\d{4,8}$').hasMatch(text.trim());
-
-    // 🧠 Mask OTP for UI only
-    final displayText = isOtp ? '*' * text.trim().length : text.trim();
-
-    final userMessage = UserMessage(
-      id: DateTime.now().toIso8601String(),
-      text: displayText, // 👈 Masked for frontend
-    );
-
-    setState(() {
-      _messages.add(userMessage);
-      _showGreeting = false;
-    });
-
-    _scrollToBottom();
+    final userMessage = UserMessage(id: DateTime.now().toString(), text: text);
+    setState(() => _messages.add(userMessage));
 
     try {
-      // ✅ Send actual OTP (not masked) to backend
       final response = await http.post(
         Uri.parse('http://10.32.2.151:3009/chatbot'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"user_id": "1", "query": text.trim()}),
+        body: jsonEncode({"user_id": "1", "query": text}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Flatten bot response
-        final botResponse = data['response'] is Map
-            ? (data['response']['response'] ?? data['response'])
-            : data['response'];
+        // Check if the response has structured data
+        final botResp = data['response'] ?? data;
+        BotMessage botMessage;
 
-        if (botResponse is String) {
-          // Simple text
-          setState(() {
-            _messages.add(BotMessage(
-              id: DateTime.now().toIso8601String(),
-              text: botResponse,
-            ));
-          });
-        } else if (botResponse is Map) {
-          final message = botResponse['message']?.toString() ?? '';
-          final recommendation = botResponse['recommendation']?.toString();
-          final showForm = botResponse['show_transfer_form'] == true;
-
-          // Normal text message
-          if (message.isNotEmpty) {
-            setState(() {
-              _messages.add(BotMessage(
-                id: DateTime.now().toIso8601String(),
-                text: message,
-              ));
-            });
-          }
-
-          // Recommendation
-          if (recommendation != null && recommendation.isNotEmpty) {
-            setState(() {
-              _messages.add(BotMessage(
-                id: "recommendation_${DateTime.now().toIso8601String()}",
-                text: recommendation,
-                extraData: {
-                  "recommendation_id": botResponse['recommendation_id'],
-                },
-              ));
-            });
-          }
-          // Transfer form
-          if (showForm) {
-            final beneficiary =
-                botResponse['beneficiary_name']?.toString() ?? '';
-            final amount =
-                double.tryParse(botResponse['amount']?.toString() ?? '') ?? 0.0;
-
-            setState(() {
-              _messages.add(BotMessage(
-                id: "transfer_form_button_${DateTime.now().toIso8601String()}",
-                text: "[SHOW_TRANSFER_FORM_BUTTON]",
-                extraData: {
-                  "beneficiary_name": beneficiary,
-                  "amount": amount,
-                },
-              ));
-            });
-          }
-          logger.info("Bot response received: $botResponse");
-          // Spend insights handling (structured summary)
-          if (botResponse['breakdown_merchants'] != null )  {
-            logger.info("Adding spend insights summary: ${botResponse['response']}");
-          }
-          if (botResponse != null) {
-            final summary = botResponse;
-            logger.info("Adding spend insights summary: $summary");
-
-            setState(() {
-              _messages.add(BotMessage(
-                id: "spend_summary_${DateTime.now().toIso8601String()}",
-                text: "[SPEND_INSIGHTS_SUMMARY]",
-                extraData: {
-                  "summary_title": summary["summary_title"],
-                  "total_spent": summary["total_spent"],
-                  "chart_data": summary["chart_data"],
-                  "breakdown_merchants": summary["breakdown_merchants"],
-                  "trend_insights": summary["trend_insights"],
-                },
-              ));
-            });
-          }
+        if (botResp['transfer'] != null || botResp['recommendation'] != null) {
+          botMessage = BotMessage(
+            id: DateTime.now().toString(),
+            text: botResp['recommendation'] ?? "Transfer processed",
+          );
         } else {
-          setState(() {
-            _messages.add(BotMessage(
-              id: DateTime.now().toIso8601String(),
-              text: "Unexpected response format from server.",
-            ));
-          });
+          // Plain text fallback
+          botMessage = BotMessage(
+            id: DateTime.now().toString(),
+            text: botResp.toString(),
+          );
         }
+
+        setState(() => _messages.add(botMessage));
       } else {
-        setState(() {
-          _messages.add(BotMessage(
-            id: DateTime.now().toIso8601String(),
-            text: "Error: Server returned ${response.statusCode}",
-          ));
-        });
+        setState(() => _messages.add(
+              BotMessage(
+                id: DateTime.now().toString(),
+                text: "Error: ${response.statusCode}",
+              ),
+            ));
       }
     } catch (e) {
-      setState(() {
-        _messages.add(BotMessage(
-          id: DateTime.now().toIso8601String(),
-          text: "Error: Failed to connect to server.\n$e",
-        ));
-      });
+      setState(() => _messages.add(
+            BotMessage(
+              id: DateTime.now().toString(),
+              text: "Error: $e",
+            ),
+          ));
     }
-
-    _scrollToBottom();
-  }
-
-// Helper function to safely scroll to bottom
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      }
-    });
   }
 }
