@@ -156,7 +156,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const double fixedWidth = 390;
+    const double fixedWidth = 412;
     const double fixedHeight = 844;
 
     return LayoutBuilder(builder: (context, constraints) {

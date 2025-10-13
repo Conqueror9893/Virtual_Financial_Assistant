@@ -22,8 +22,11 @@ def extract_transfer_details(query: str) -> dict:
     try:
         parsed = json.loads(response)
         # Ensure required keys exist
+        amount = parsed.get("amount")
+        if isinstance(amount, str) and amount.isdigit():
+            amount = int(amount)
         return {
-            "amount": parsed.get("amount"),
+            "amount": amount,
             "beneficiary": parsed.get("beneficiary"),
             "frequency": parsed.get("frequency", "one-time")
         }
@@ -36,15 +39,28 @@ def extract_transfer_details(query: str) -> dict:
 def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
     """
     Main transfer handler.
-    - Step 1: Parse transfer request (otp=None, query string).
-    - Step 2: Validate OTP and perform transfer (otp != None, transfer details dict).
-    - Step 3: Confirm recommendation (query_or_details with action=confirm_recommendation).
+
+    Steps:
+      1. Parse transfer request (otp=None, query string)
+      2. Validate OTP & perform transfer (otp != None)
+      3. Confirm recommendation (query_or_details with action=confirm_recommendation)
     """
+
     # --- Step 3: Recommendation confirmation flow ---
     if isinstance(query_or_details, dict) and query_or_details.get("action") == "confirm_recommendation":
         beneficiary_id = query_or_details.get("beneficiary_id")
         recommendation_id = query_or_details.get("recommendation_id")
-        return confirm_recommendation(beneficiary_id, recommendation_id, otp)
+
+        # ✅ Fetch last successful transfer response if provided by frontend
+        last_transfer_response = query_or_details.get("last_transfer_response")
+
+        # ✅ Pass it to confirm_recommendation()
+        return confirm_recommendation(
+            beneficiary_id,
+            recommendation_id,
+            otp,  # this `otp` param here is reused as the body (user reply "yes"/"no")
+            last_transfer_response=last_transfer_response
+        )
 
     # --- Step 1: Initial transfer request (query string, otp not provided) ---
     if otp is None and isinstance(query_or_details, str):
@@ -62,7 +78,6 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
         return {
             "status": "otp_required",
             "message": f"OTP sent to registered mobile for transfer of ₹{amount} to {beneficiary['name']}.",
-            "otp_debug": otp_code,  # remove later
             "transfer_details": details
         }
 
@@ -79,7 +94,9 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
         if not beneficiary:
             return {"status": "error", "message": f"Beneficiary '{nickname}' not found."}
 
-        if not transfer_tool.validate_otp(user_id, otp):
+        # ✅ Updated OTP validation call (since validate_otp returns tuple)
+        is_valid, _ = transfer_tool.validate_otp(user_id, otp)
+        if not is_valid:
             return {
                 "status": "otp_incorrect",
                 "message": "Invalid OTP.",
@@ -87,15 +104,27 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
                 "otp_incorrect": True
             }
 
+        # Perform the actual transfer
         result = transfer_tool.perform_transfer(user_id, beneficiary, amount)
-        recommendation = f"You sent ₹{amount} to {beneficiary['name']} today. Would you like to make this a monthly transfer?"
 
-        return {
+        recommendation = (
+            f"You sent Rs {amount} to {beneficiary['name']} today. "
+            f"Would you like to make this a monthly transfer?"
+        )
+
+        # Flattened, single-level response JSON
+        transfer_response = {
             "status": "success",
-            "transfer": result,
+            "message": f"Transfer of Rs {amount} to {beneficiary['name']} successful.",
+            "amount": amount,
+            "beneficiary": beneficiary["name"],
+            "account": beneficiary.get("account_number"),
+            "ifsc": beneficiary.get("ifsc"),
+            "timestamp": result.get("timestamp"),
             "recommendation": recommendation,
-            "beneficiary_id": beneficiary.get("id", beneficiary.get("account_number")),
             "recommendation_id": f"rec-{user_id}-{beneficiary.get('account_number')}"
         }
+
+        return transfer_response
 
     return {"status": "error", "message": "Invalid transfer request format."}

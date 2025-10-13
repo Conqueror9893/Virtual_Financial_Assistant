@@ -3,12 +3,14 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from threading import Lock
 import requests
+import json
 from langgraph_flow.nodes.spend_insights_node import handle_spend_insight
-from langgraph_flow.nodes.output_formatter import format_spend_response
+from utils.output_formatter import format_spend_response
 from langgraph_flow.nodes.faq_node import handle_faq
 from langgraph_flow.nodes.offers_node import handle_offers
 from langgraph_flow.nodes.transfer_node import handle_transfer
 from langgraph_flow.nodes.intent_classifier import classify_intent
+from utils.llm_connector import run_llm
 from utils.logger import get_logger
 
 from langgraph_flow.langgraph_flow import build_flow, ConversationPhase
@@ -51,6 +53,57 @@ def save_user_state(user_id, state):
         user_states[user_id] = state
 
 
+def llm_format_chat_response(raw_response: dict, user_query: str) -> str:
+    """
+    Use LLM to convert structured backend responses into friendly chat replies.
+    Ensures recommendation (if present) is preserved exactly as-is.
+    """
+
+    # Flatten nested responses (if any)
+    if "response" in raw_response and isinstance(raw_response["response"], dict):
+        inner = raw_response["response"]
+        # Merge inner dict if it's nested under another "response"
+        if "response" in inner and isinstance(inner["response"], dict):
+            raw_response = inner["response"]
+        else:
+            raw_response = inner
+
+    recommendation = raw_response.get("recommendation")
+    flattened_json = json.dumps(raw_response, indent=2)
+
+    # --- Prompt for LLM ---
+    prompt = f"""
+You are a helpful, professional banking assistant.
+The user asked: "{user_query}"
+
+Here is the structured backend response:
+{flattened_json}
+
+Your task:
+1. Formulate a concise, conversational reply describing what happened.
+2. Summarize the key info like amount, beneficiary, and status clearly.
+3. Avoid exposing internal keys or JSON formatting.
+4. Keep the tone polite and human, suitable for an in-app chatbot.
+
+Currency is USD. Use the same currency in your response.
+Do not start the response with "As an AI language model" or with greetings like "Hi" or "Hello". Also do not with "Best regards".
+"""
+
+    llm_output = run_llm(prompt)
+
+    # Fallbacks if LLM fails
+    if not llm_output:
+        if recommendation:
+            return f"{raw_response.get('message', '')}\n\n{recommendation}"
+        return raw_response.get("message", str(raw_response))
+
+    # # Ensure recommendation is preserved if LLM trimmed it out
+    # if recommendation and recommendation not in llm_output:
+    #     llm_output += f"\n\n{recommendation}"
+    logger.info("LLM chat response: %s", llm_output)
+    return llm_output
+
+
 # ---------------- Routes ----------------
 @app.route("/api/health")
 def health():
@@ -83,180 +136,178 @@ def chatbot():
     otp = data.get("otp")
 
     if not query and not otp:
-        return (
-            jsonify({"status": "error", "message": "'query' or 'otp' is required"}),
-            400,
-        )
+        return jsonify({"status": "error", "message": "'query' or 'otp' is required"}), 400
 
     user_state = get_user_state(user_id)
     current_phase = user_state.get("phase", ConversationPhase.NORMAL)
 
-    # ---------------------------
-    # If user is already in a transfer-related phase, prioritize transfer flow
-    # ---------------------------
     if current_phase in (ConversationPhase.OTP, ConversationPhase.CONFIRMATION):
-        text = (query or "").strip()
+        return handle_transfer_phase(user_id, user_state, query, otp)
 
-        # --- NEW: Explicit confirmation handling for CONFIRMATION phase ---
-        if current_phase == ConversationPhase.CONFIRMATION:
-            lower_text = text.lower()
-            if lower_text in ("yes", "y"):
-                user_state["phase"] = ConversationPhase.CONFIRMATION
-                save_user_state(user_id, user_state)
-                resp = requests.post(
-                    f"{API_BASE}/transfer",
-                    json={"user_id": user_id, "query": "CONFIRM_YES"},
-                ).json()
-                return jsonify({"status": "ok", "response": resp})  # <--- ADD THIS
-            elif lower_text in ("no", "n"):
-                user_state["phase"] = ConversationPhase.CONFIRMATION
-                save_user_state(user_id, user_state)
-                resp = requests.post(
-                    f"{API_BASE}/transfer",
-                    json={"user_id": user_id, "query": "CONFIRM_NO"},
-                ).json()
-                return jsonify({"status": "ok", "response": resp})  # <--- ADD THIS
-            else:
-                return jsonify(
-                    {
-                        "status": "pending_cancel",
-                        "response": "Please reply yes/no for the recommendation, or cancel the flow.",
-                    }
-                )
+    return handle_normal_phase(user_id, user_state, query, otp)
 
-        # 1) Explicit cancellation confirmation
-        if text.lower() in ("yes", "y", "cancel", "abort"):
-            try:
-                cancel_resp = requests.post(
-                    f"{API_BASE}/transfer/cancel", json={"user_id": user_id}
-                ).json()
-            except Exception as e:
-                logger.exception("transfer/cancel failed")
-                return (
-                    jsonify(
-                        {
-                            "status": "error",
-                            "message": f"Failed to cancel pending transfer: {e}",
-                        }
-                    ),
-                    500,
-                )
+def handle_transfer_phase(user_id, user_state, query, otp):
+    current_phase = user_state.get("phase", ConversationPhase.NORMAL)
+    text = (query or "").strip()
 
-            user_state["phase"] = ConversationPhase.NORMAL
-            user_state["pending_transfer"] = None
-            user_state["confirmation_context"] = None
-            save_user_state(user_id, user_state)
+    if current_phase == ConversationPhase.CONFIRMATION:
+        logger.info("Handling confirmation phase with input: %s", text)
+        return handle_confirmation_phase(user_id, user_state, text)
 
-            return jsonify({"status": "ok", "response": cancel_resp})
+    if text.lower() in ("yes", "y", "cancel", "abort"):
+        return cancel_pending_transfer(user_id, user_state)
 
-        # 2) User explicitly chooses to continue
-        if text.lower() in ("no", "n", "continue"):
-            return jsonify(
-                {
-                    "status": "ok",
-                    "response": "Okay - please continue with your pending transfer (for example, provide the OTP).",
-                }
+    if text.lower() in ("no", "n", "continue"):
+        return jsonify({
+            "status": "ok",
+            "response": "Okay - please continue with your pending transfer (for example, provide the OTP).",
+        })
+
+    otp_candidate = get_otp_candidate(query, otp)
+    if otp_candidate:
+        return process_otp(user_id, user_state, otp_candidate)
+
+    return jsonify({
+        "status": "pending_cancel",
+        "response": "You have a pending transfer. Do you want to cancel it and continue with your new request?",
+    })
+
+def handle_confirmation_phase(user_id, user_state, text):
+    """
+    Handles the confirmation phase safely, with proper JSON decode protection.
+    """
+    lower_text = text.lower()
+
+    if lower_text in ("yes", "y"):
+        user_state["phase"] = ConversationPhase.CONFIRMATION
+        user_state["user_input"] = "CONFIRM_YES"
+        save_user_state(user_id, user_state)
+
+        try:
+            r = requests.post(
+                f"{API_BASE}/transfer",
+                json={"user_id": user_id, "query": "CONFIRM_YES"},
+                timeout=10,  # optional: avoid hanging
             )
-
-        # 3) If the user input looks like an OTP (digits of reasonable length), forward to transfer as OTP
-        looks_like_otp = False
-        otp_candidate = None
-        if otp:
-            otp_candidate = str(otp).strip()
-            looks_like_otp = otp_candidate.isdigit()
-        elif query and query.strip().isdigit() and 3 <= len(query.strip()) <= 8:
-            otp_candidate = query.strip()
-            looks_like_otp = True
-
-        if looks_like_otp:
             try:
-                resp = requests.post(
-                    f"{API_BASE}/transfer",
-                    json={"user_id": user_id, "otp": otp_candidate},
-                ).json()
-            except Exception as e:
-                logger.exception("Transfer service call failed")
-                return (
-                    jsonify(
-                        {"status": "error", "message": f"Transfer service failed: {e}"}
-                    ),
-                    500,
+                resp = r.json()
+            except requests.JSONDecodeError:
+                logger.error(
+                    "Invalid JSON from transfer API (CONFIRM_YES): status=%s, text=%s",
+                    r.status_code, r.text
                 )
+                return jsonify({
+                    "status": "error",
+                    "message": "Transfer API returned invalid response",
+                    "raw": r.text,
+                    "http_status": r.status_code
+                }), 500
 
-            status = resp.get("status")
-            logger.info(f"Transfer response status: {status}")
-            if status == "otp_required":
-                user_state["phase"] = ConversationPhase.OTP
-                user_state["pending_transfer"] = resp.get("transfer_details")
-            elif status == "success" and resp.get("recommendation"):
-                user_state["phase"] = ConversationPhase.CONFIRMATION
-                logger.info("Entering CONFIRMATION phase")
-                user_state["confirmation_context"] = {
-                    "action": "confirm_recommendation",
-                    "details": resp,
-                }
-            else:
-                logger.info("Transfer completed or failed, returning to NORMAL phase")
-                user_state["phase"] = ConversationPhase.NORMAL
-                user_state["pending_transfer"] = None
-                user_state["confirmation_context"] = None
+            return jsonify({"response": resp})
 
-            save_user_state(user_id, user_state)
+        except requests.RequestException as e:
+            logger.exception("Transfer API request failed")
+            return jsonify({
+                "status": "error",
+                "message": f"Transfer API request failed: {e}"
+            }), 500
+
+    elif lower_text in ("no", "n"):
+        user_state["phase"] = ConversationPhase.CONFIRMATION
+        user_state["user_input"] = "CONFIRM_NO"
+        save_user_state(user_id, user_state)
+
+        try:
+            r = requests.post(
+                f"{API_BASE}/transfer",
+                json={"user_id": user_id, "query": "CONFIRM_NO"},
+                timeout=10,
+            )
+            try:
+                resp = r.json()
+            except requests.JSONDecodeError:
+                logger.error(
+                    "Invalid JSON from transfer API (CONFIRM_NO): status=%s, text=%s",
+                    r.status_code, r.text
+                )
+                return jsonify({
+                    "status": "error",
+                    "message": "Transfer API returned invalid response",
+                    "raw": r.text,
+                    "http_status": r.status_code
+                }), 500
+
             return jsonify({"status": "ok", "response": resp})
 
-        # 4) Otherwise: treat this as a new query attempt - ask for cancel confirmation
-        return jsonify(
-            {
-                "status": "pending_cancel",
-                "response": "You have a pending transfer. Do you want to cancel it and continue with your new request?",
-            }
-        )
+        except requests.RequestException as e:
+            logger.exception("Transfer API request failed")
+            return jsonify({
+                "status": "error",
+                "message": f"Transfer API request failed: {e}"
+            }), 500
 
-    # ---------------------------
-    # Not in a transfer phase: normal behavior -> call Intent API then dispatch
-    # ---------------------------
+    else:
+        return jsonify({
+            "status": "pending_cancel",
+            "response": "Please reply yes/no for the recommendation, or cancel the flow.",
+        })
+
+
+def cancel_pending_transfer(user_id, user_state):
     try:
-        intent_resp = requests.post(f"{API_BASE}/intent", json={"query": query}).json()
-        intent = intent_resp.get("intent", "faq")
+        cancel_resp = requests.post(
+            f"{API_BASE}/transfer/cancel", json={"user_id": user_id}
+        ).json()
     except Exception as e:
-        logger.exception("Intent service failed")
-        return (
-            jsonify({"status": "error", "message": f"Intent service failed: {e}"}),
-            500,
-        )
+        logger.exception("transfer/cancel failed")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to cancel pending transfer: {e}",
+        }), 500
 
+    user_state["phase"] = ConversationPhase.NORMAL
+    user_state["pending_transfer"] = None
+    user_state["confirmation_context"] = None
+    save_user_state(user_id, user_state)
+
+    return jsonify({"status": "ok", "response": cancel_resp})
+
+def get_otp_candidate(query, otp):
+    if otp:
+        otp_candidate = str(otp).strip()
+        if otp_candidate.isdigit():
+            return otp_candidate
+    elif query and query.strip().isdigit() and 3 <= len(query.strip()) <= 8:
+        return query.strip()
+    return None
+
+def process_otp(user_id, user_state, otp_candidate):
     try:
-        if intent == "fund_transfer":
-            resp = requests.post(
-                f"{API_BASE}/transfer",
-                json={"user_id": user_id, "query": query, "otp": otp},
-            ).json()
-        elif intent == "spends_check":
-            resp = requests.post(
-                f"{API_BASE}/spend", json={"user_id": user_id, "query": query}
-            ).json()
-        elif intent == "balance_check":
-            resp = requests.post(
-                f"{API_BASE}/faq", json={"user_id": user_id, "query": query}
-            ).json()
-        elif intent == "offers":
-            resp = requests.post(
-                f"{API_BASE}/offers",
-                json={"user_id": user_id, "query": query or "Show me offers"},
-            ).json()
-        else:
-            resp = requests.post(
-                f"{API_BASE}/faq", json={"user_id": user_id, "query": query}
-            ).json()
+        resp = requests.post(
+            f"{API_BASE}/transfer",
+            json={"user_id": user_id, "otp": otp_candidate},
+        ).json()
     except Exception as e:
-        logger.exception("Downstream API call failed")
-        return jsonify({"status": "error", "message": f"Service call failed: {e}"}), 500
+        logger.exception("Transfer service call failed")
+        return jsonify({"status": "error", "message": f"Transfer service failed: {e}"}), 500
 
-    inner_resp = (
-        resp.get("response") if isinstance(resp.get("response"), dict) else resp
-    )
+    inner_resp = resp.get("response", resp)
+    if isinstance(inner_resp, dict) and "response" in inner_resp:
+        inner_resp = inner_resp["response"]
+
+    user_query_for_llm = otp_candidate
+    llm_text = llm_format_chat_response(inner_resp, user_query_for_llm)
+
+    if inner_resp.get("recommendation"):
+        final_response = {
+            "message": llm_text,
+            "recommendation": inner_resp["recommendation"],
+            "recommendation_id": inner_resp.get("recommendation_id"),
+        }
+    else:
+        final_response = {"message": llm_text}
+
     status = inner_resp.get("status")
-
     if status == "otp_required":
         user_state["phase"] = ConversationPhase.OTP
         user_state["pending_transfer"] = inner_resp.get("transfer_details")
@@ -272,7 +323,77 @@ def chatbot():
         user_state["confirmation_context"] = None
 
     save_user_state(user_id, user_state)
-    return jsonify({"status": "ok", "response": resp})
+    return jsonify({"status": "ok", "response": final_response})
+
+def handle_normal_phase(user_id, user_state, query, otp):
+    try:
+        intent_resp = requests.post(f"{API_BASE}/intent", json={"query": query}).json()
+        intent = intent_resp.get("intent", "faq")
+    except Exception as e:
+        logger.exception("Intent service failed")
+        return jsonify({"status": "error", "message": f"Intent service failed: {e}"}), 500
+
+    try:
+        resp = dispatch_intent(intent, user_id, query, otp)
+    except Exception as e:
+        logger.exception("Downstream API call failed")
+        return jsonify({"status": "error", "message": f"Service call failed: {e}"}), 500
+
+    inner_resp = resp.get("response") if isinstance(resp.get("response"), dict) else resp
+    spend_structured_summary = inner_resp.get("raw") if isinstance(inner_resp.get("raw"), dict) else None
+    status = inner_resp.get("status")
+
+    # Phase updates
+    if status == "otp_required":
+        user_state["phase"] = ConversationPhase.OTP
+        user_state["pending_transfer"] = inner_resp.get("transfer_details")
+    elif status == "success" and inner_resp.get("recommendation"):
+        user_state["phase"] = ConversationPhase.CONFIRMATION
+        user_state["confirmation_context"] = {
+            "action": "confirm_recommendation",
+            "details": inner_resp,
+        }
+    else:
+        user_state["phase"] = ConversationPhase.NORMAL
+        user_state["pending_transfer"] = None
+        user_state["confirmation_context"] = None
+
+    save_user_state(user_id, user_state)
+
+    user_query_for_llm = query or otp or ""
+
+    # Skip LLM formatting for spend intent (it's already well formatted)
+    if intent == "spends_check":
+        chat_reply = spend_structured_summary.get("structured_summary") or spend_structured_summary if isinstance(spend_structured_summary, dict) else inner_resp
+    else:
+        chat_reply = llm_format_chat_response(inner_resp, user_query_for_llm)
+
+    return jsonify({"status": "ok", "response": chat_reply})
+
+
+def dispatch_intent(intent, user_id, query, otp):
+    if intent == "fund_transfer":
+        return requests.post(
+            f"{API_BASE}/transfer",
+            json={"user_id": user_id, "query": query, "otp": otp},
+        ).json()
+    elif intent == "spends_check":
+        return requests.post(
+            f"{API_BASE}/spend", json={"user_id": user_id, "query": query}
+        ).json()
+    elif intent == "balance_check":
+        return requests.post(
+            f"{API_BASE}/faq", json={"user_id": user_id, "query": query}
+        ).json()
+    elif intent == "offers":
+        return requests.post(
+            f"{API_BASE}/offers",
+            json={"user_id": user_id, "query": query or "Show me offers"},
+        ).json()
+    else:
+        return requests.post(
+            f"{API_BASE}/faq", json={"user_id": user_id, "query": query}
+        ).json()
 
 
 @app.route("/transfer", methods=["POST"])
@@ -294,12 +415,15 @@ def transfer():
 
     # ----- Confirmation step -----
     if user_state["phase"] == ConversationPhase.CONFIRMATION:
+        logger.info("Handling confirmation step with input: %s", user_input)
         # --- NEW: Handle explicit confirmation input ---
         if user_input in ("CONFIRM_YES", "CONFIRM_NO"):
             user_state["user_input"] = user_input
+            logger.info("User confirmation input: %s", user_input)
             user_state["intent"] = "confirmation"
             result = graph.invoke(user_state)
             save_user_state(user_id, result)
+            logger.info("Confirmation result: %s", result)
             return jsonify({"status": "ok", "response": result["result"]})
         else:
             return (
