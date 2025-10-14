@@ -10,6 +10,8 @@ from .nodes.spend_insights_node import handle_spend_insight
 from .nodes.faq_node import handle_faq
 from .nodes.offers_node import handle_offers
 from .nodes.transfer_node import handle_transfer, confirm_recommendation
+from .nodes.contextual_questions_node import handle_contextual_questions_node
+from .nodes.voice_node import handle_voice_interaction
 from utils.logger import get_logger
 from utils.llm_connector import run_llm
 
@@ -100,6 +102,14 @@ def run_handler(state: AgentState, handler_fn) -> AgentState:
         state["result"] = {"status": "error", "message": str(e)}
     return state
 
+def voice_node(state: AgentState) -> AgentState:
+    """Handles voice interaction node."""
+    ensure_state_defaults(state)
+    user_id = state.get("user_id", "1")
+    result = handle_voice_interaction(user_id, state.get("user_input", ""))
+    state["result"] = result
+    return state
+
 
 # ---------- Intent Classification Node ----------
 def classify_intent(state: AgentState) -> AgentState:
@@ -183,17 +193,61 @@ def classify_new_query(user_input: str) -> str:
 # ---------- Handlers ----------
 def spends_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
-    return run_handler(state, handle_spend_insight)
+    state = run_handler(state, handle_spend_insight)
+    # Call contextual questions
+    response_text = ""
+    if state.get("result"):
+        if isinstance(state["result"], dict) and "response" in state["result"]:
+            response_text = str(state["result"]["response"])
+        else:
+            response_text = str(state["result"])
+    suggestions = handle_contextual_questions_node(
+        user_id=int(state.get("user_id", 1)),
+        last_query=state.get("user_input", ""),
+        last_response=response_text
+    )
+    state["contextual_questions"] = suggestions.get("contextual_questions", [])
+    return state
+
+
 
 
 def faq_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
-    return run_handler(state, handle_faq)
+    state = run_handler(state, handle_faq)
+    response_text = ""
+    if state.get("result"):
+        if isinstance(state["result"], dict) and "response" in state["result"]:
+            response_text = str(state["result"]["response"])
+        else:
+            response_text = str(state["result"])
+    suggestions = handle_contextual_questions_node(
+        user_id=int(state.get("user_id", 1)),
+        last_query=state.get("user_input", ""),
+        last_response=response_text
+    )
+    state["contextual_questions"] = suggestions.get("contextual_questions", [])
+    return state
 
 
 def offers_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
-    return run_handler(state, handle_offers)
+    state = run_handler(state, handle_offers)
+    response_text = ""
+    if state.get("result"):
+        if isinstance(state["result"], dict) and "response" in state["result"]:
+            response_text = str(state["result"]["response"])
+        else:
+            response_text = str(state["result"])
+    suggestions = handle_contextual_questions_node(
+        user_id=int(state.get("user_id", 1)),
+        last_query=state.get("user_input", ""),
+        last_response=response_text
+    )
+    state["contextual_questions"] = suggestions.get("contextual_questions", [])
+    return state
+
+
 
 
 def transfer_node(state: AgentState) -> AgentState:
@@ -229,7 +283,7 @@ def transfer_node(state: AgentState) -> AgentState:
         isinstance(transfer_result, dict)
         and transfer_result.get("status") == "otp_required"
     ):
-        # transfer_details should be returned as dict by handle_transfer â€” if string, try to parse
+        # transfer_details should be returned as dict by handle_transfer if string, try to parse
         parsed = transfer_result.get("transfer_details", {})
         if isinstance(parsed, str):
             try:
@@ -480,6 +534,7 @@ def build_flow():
     workflow = StateGraph(AgentState)
 
     # --- Add Nodes ---
+    workflow.add_node("voice", voice_node)
     workflow.add_node("classify_intent", classify_intent)
     workflow.add_node("spend", spends_node)
     workflow.add_node("faq", faq_node)
@@ -498,6 +553,7 @@ def build_flow():
         "classify_intent",
         lambda state: state.get("intent", "unknown"),
         {
+            
             "spend": "spend",
             "faq": "faq",
             "offers": "offers",
@@ -523,6 +579,8 @@ def build_flow():
         "unknown",
     ]:
         workflow.add_edge(node, END)
+    workflow.add_edge("voice", END)
+
 
     return workflow.compile()
 

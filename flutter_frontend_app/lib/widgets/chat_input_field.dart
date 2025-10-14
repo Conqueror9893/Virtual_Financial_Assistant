@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 class ChatInputField extends StatefulWidget {
   final String hintText;
   final Function(String) onSendMessage;
-  const ChatInputField(
-      {super.key, required this.hintText, required this.onSendMessage});
+  final VoidCallback? onMicPressed; // Callback for mic button press
+  const ChatInputField({
+    super.key,
+    required this.hintText,
+    required this.onSendMessage,
+    this.onMicPressed,
+  });
 
   @override
   State<ChatInputField> createState() => _ChatInputFieldState();
@@ -13,6 +18,23 @@ class ChatInputField extends StatefulWidget {
 class _ChatInputFieldState extends State<ChatInputField> {
   final TextEditingController _controller = TextEditingController();
   final bool _isLoading = false;
+
+  bool _hasText = false; // Track if input has text
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Listen to text changes to toggle icon
+    _controller.addListener(() {
+      final hasText = _controller.text.trim().isNotEmpty;
+      if (_hasText != hasText) {
+        setState(() {
+          _hasText = hasText;
+        });
+      }
+    });
+  }
 
   void _sendMessage() {
     final text = _controller.text.trim();
@@ -62,11 +84,28 @@ class _ChatInputFieldState extends State<ChatInputField> {
                 )
               : IconButton(
                   iconSize: 28,
-                  icon: const Icon(Icons.send, color: Color(0xFFF87B2D)),
-                  onPressed: _sendMessage,
+                  icon: _hasText
+                      ? const Icon(Icons.send, color: Color(0xFFF87B2D))
+                      : Image.asset(
+                          'assets/microphone-2.png', // Replace with your mic icon filename
+                          width: 28,
+                          height: 28,
+                        ),
+                  onPressed: _hasText
+                      ? _sendMessage
+                      : () {
+                          print("Mic button pressed");
+                          widget.onMicPressed?.call();
+                        },
                 ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }
