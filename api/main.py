@@ -160,10 +160,7 @@ def chatbot():
     otp = data.get("otp")
 
     if not query and not otp:
-        return (
-            jsonify({"status": "error", "message": "'query' or 'otp' is required"}),
-            400,
-        )
+        return jsonify({"status": "error", "message": "'query' or 'otp' is required"}), 400
 
     user_state = get_user_state(user_id)
     current_phase = user_state.get("phase", ConversationPhase.NORMAL)
@@ -252,6 +249,33 @@ def handle_confirmation_phase(user_id, user_state, text):
                 ),
                 500,
             )
+            try:
+                resp = r.json()
+            except requests.JSONDecodeError:
+                logger.error(
+                    "Invalid JSON from transfer API (CONFIRM_YES): status=%s, text=%s",
+                    r.status_code, r.text
+                )
+                return jsonify({
+                    "status": "error",
+                    "message": "Transfer API returned invalid response",
+                    "raw": r.text,
+                    "http_status": r.status_code
+                }), 500
+
+            return jsonify({"response": resp})
+
+        except requests.RequestException as e:
+            logger.exception("Transfer API request failed")
+            return jsonify({
+                "status": "error",
+                "message": f"Transfer API request failed: {e}"
+            }), 500
+
+    elif lower_text in ("no", "n"):
+        user_state["phase"] = ConversationPhase.CONFIRMATION
+        user_state["user_input"] = "CONFIRM_NO"
+        save_user_state(user_id, user_state)
 
     elif lower_text in ("no", "n"):
         user_state["phase"] = ConversationPhase.CONFIRMATION
@@ -283,6 +307,12 @@ def handle_confirmation_phase(user_id, user_state, text):
                     ),
                     500,
                 )
+                return jsonify({
+                    "status": "error",
+                    "message": "Transfer API returned invalid response",
+                    "raw": r.text,
+                    "http_status": r.status_code
+                }), 500
 
             return jsonify({"status": "ok", "response": resp})
 
@@ -393,10 +423,7 @@ def handle_normal_phase(user_id, user_state, query, otp):
         intent = intent_resp.get("intent", "faq")
     except Exception as e:
         logger.exception("Intent service failed")
-        return (
-            jsonify({"status": "error", "message": f"Intent service failed: {e}"}),
-            500,
-        )
+        return jsonify({"status": "error", "message": f"Intent service failed: {e}"}), 500
 
     try:
         resp = dispatch_intent(intent, user_id, query, otp)

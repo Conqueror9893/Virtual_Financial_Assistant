@@ -211,6 +211,7 @@ def spends_node(state: AgentState) -> AgentState:
 
 
 
+
 def faq_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     state = run_handler(state, handle_faq)
@@ -228,6 +229,7 @@ def faq_node(state: AgentState) -> AgentState:
     state["contextual_questions"] = suggestions.get("contextual_questions", [])
     return state
 
+
 def offers_node(state: AgentState) -> AgentState:
     ensure_state_defaults(state)
     state = run_handler(state, handle_offers)
@@ -244,6 +246,7 @@ def offers_node(state: AgentState) -> AgentState:
     )
     state["contextual_questions"] = suggestions.get("contextual_questions", [])
     return state
+
 
 
 
