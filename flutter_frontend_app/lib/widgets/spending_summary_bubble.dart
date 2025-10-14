@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 
 class SpendingSummaryBubble extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -124,12 +123,12 @@ class SpendingSummaryBubble extends StatelessWidget {
                   color: Colors.black87,
                   fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 24), // PAD ABOVE ROW
+            const SizedBox(height: 16), // PAD ABOVE ROW
 
             Center(
               child: SizedBox(
                 width:
-                    280, // Constrained total width for both chart and categories
+                    255, // Constrained total width for both chart and categories
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -164,10 +163,10 @@ class SpendingSummaryBubble extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 24),
+                    const SizedBox(width: 16),
                     // Reduced width for Categories
                     SizedBox(
-                      width: 140,
+                      width: 120,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

@@ -18,6 +18,7 @@ class BotMessage extends ChatMessage {
   final Map<String, double>? breakdown;
   final String? spendingTrend;
   final String? summary;
+  final Map<String, dynamic>? extraData; // for any additional data
 
   BotMessage({
     required String id,
@@ -27,5 +28,6 @@ class BotMessage extends ChatMessage {
     this.breakdown,
     this.spendingTrend,
     this.summary,
+    this.extraData,
   }) : super(id: id);
 }
