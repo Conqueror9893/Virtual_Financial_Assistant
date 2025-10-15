@@ -41,11 +41,51 @@ def load_beneficiaries():
         return []
 
 
-def resolve_beneficiary(nickname: str):
+def find_matching_beneficiaries(nickname: str):
+    """
+    Return all beneficiaries whose name or nickname matches (case-insensitive).
+    """
+    matches = []
+    logger.info("Searching for beneficiaries matching nickname '%s'", nickname)
     for b in load_beneficiaries():
-        if b["nickname"].lower() == nickname.lower():
-            return b
+        if (
+            b.get("nickname", "").lower() == nickname.lower()
+            or b.get("name", "").lower() == nickname.lower()
+        ):
+            matches.append(b)
+    logger.info("Found %d matches for nickname '%s'", len(matches), nickname)
+    return matches
+
+
+def resolve_beneficiary(nickname: str):
+    """
+    If one match → return it directly.
+    If multiple matches → return None and a disambiguation payload.
+    """
+    logger.info("Resolving beneficiary for nickname '%s'", nickname)
+    matches = find_matching_beneficiaries(nickname)
+    if len(matches) == 1:
+        logger.info("Single match found for nickname '%s'", nickname)
+        return matches[0]
+    elif len(matches) > 1:
+        # Return special marker to trigger clarification in frontend
+        return {
+            "status": "multiple_matches",
+            "message": f"Multiple beneficiaries found for '{nickname}'. Please choose one.",
+            "options": [
+                {
+                    "id": b.get("id"),
+                    "name": b.get("name"),
+                    "nickname": b.get("nickname"),
+                    "account_number": b.get("account_number"),
+                    "ifsc": b.get("ifsc"),
+                    "bank": b.get("bank"),
+                }
+                for b in matches
+            ],
+        }
     return None
+
 
 
 def generate_otp(user_id: int) -> str:

@@ -102,6 +102,7 @@ def run_handler(state: AgentState, handler_fn) -> AgentState:
         state["result"] = {"status": "error", "message": str(e)}
     return state
 
+
 def voice_node(state: AgentState) -> AgentState:
     """Handles voice interaction node."""
     ensure_state_defaults(state)
@@ -123,9 +124,23 @@ def classify_intent(state: AgentState) -> AgentState:
     # --- Interruption Detection ---
     is_interruption = False
     if phase == ConversationPhase.OTP and not user_input.isdigit():
-        is_interruption = True
-    elif phase == ConversationPhase.CONFIRMATION and user_input not in ["yes", "no"]:
-        is_interruption = True
+        new_intent = classify_new_query(user_input)
+        if new_intent != "unknown":
+            state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
+            state["intent"] = "interruption_confirmation"
+            state["interrupted_state"] = {
+                "phase": phase,
+                "pending_transfer": state.get("pending_transfer"),
+                "confirmation_context": state.get("confirmation_context"),
+                "otp_attempts": state.get("otp_attempts"),
+                "new_intent": new_intent,
+            }
+            return state
+        elif phase == ConversationPhase.CONFIRMATION and user_input not in [
+            "yes",
+            "no",
+        ]:
+            is_interruption = True
 
     if is_interruption:
         # Classify the new, interrupting query
@@ -204,12 +219,10 @@ def spends_node(state: AgentState) -> AgentState:
     suggestions = handle_contextual_questions_node(
         user_id=int(state.get("user_id", 1)),
         last_query=state.get("user_input", ""),
-        last_response=response_text
+        last_response=response_text,
     )
     state["contextual_questions"] = suggestions.get("contextual_questions", [])
     return state
-
-
 
 
 def faq_node(state: AgentState) -> AgentState:
@@ -224,7 +237,7 @@ def faq_node(state: AgentState) -> AgentState:
     suggestions = handle_contextual_questions_node(
         user_id=int(state.get("user_id", 1)),
         last_query=state.get("user_input", ""),
-        last_response=response_text
+        last_response=response_text,
     )
     state["contextual_questions"] = suggestions.get("contextual_questions", [])
     return state
@@ -242,12 +255,10 @@ def offers_node(state: AgentState) -> AgentState:
     suggestions = handle_contextual_questions_node(
         user_id=int(state.get("user_id", 1)),
         last_query=state.get("user_input", ""),
-        last_response=response_text
+        last_response=response_text,
     )
     state["contextual_questions"] = suggestions.get("contextual_questions", [])
     return state
-
-
 
 
 def transfer_node(state: AgentState) -> AgentState:
@@ -340,8 +351,9 @@ def otp_node(state: AgentState) -> AgentState:
         return state
 
     if transfer_result.get("status") == "otp_incorrect":
-        state["otp_attempts"] = int(state.get("otp_attempts", 0)) + 1
+        state["otp_attempts"] += 1
         if state["otp_attempts"] >= 3:
+            # Reset phase and intent here explicitly
             state.update(
                 {
                     "result": {
@@ -349,22 +361,25 @@ def otp_node(state: AgentState) -> AgentState:
                         "message": "Maximum OTP attempts reached. Transfer cancelled.",
                     },
                     "phase": ConversationPhase.NORMAL,
+                    "intent": "unknown",  # Reset intent too
                     "pending_transfer": None,
                     "otp_attempts": 0,
                 }
             )
+            return state
         else:
-            remaining = 3 - state["otp_attempts"]
+            # keep in OTP phase for retries
             state.update(
                 {
                     "result": {
                         "status": "error",
-                        "message": f"Incorrect OTP. {remaining} attempt(s) left.",
+                        "message": f"Incorrect OTP. {3 - state['otp_attempts']} attempts left.",
                     },
                     "phase": ConversationPhase.OTP,
+                    "intent": "otp",  # Make sure intent matches phase
                 }
             )
-        return state
+            return state
 
     # OTP validated (or other final result)
     state.update(
@@ -415,7 +430,6 @@ def confirmation_node(state: AgentState) -> AgentState:
     user_input = normalize_confirmation_input(state.get("user_input"))
     state["user_input"] = user_input
 
-
     # --- Retrieve context of what's being confirmed ---
     ctx = state.get("confirmation_context") or {}
     action = ctx.get("action")
@@ -448,6 +462,7 @@ def confirmation_node(state: AgentState) -> AgentState:
             {
                 "result": result,
                 "phase": ConversationPhase.NORMAL,
+                "intent": "unknown",  # reset intent too
                 "confirmation_context": None,
             }
         )
@@ -475,13 +490,13 @@ def interruption_confirmation_node(state: AgentState) -> AgentState:
     if user_input == "yes":
         # User wants to abandon the old task and start the new one.
         # The new intent is stored in the interrupted_state.
+        state["pending_transfer"] = None
+        state["otp_attempts"] = 0
         new_intent = interrupted_state.get("new_intent", "unknown")
         state["intent"] = new_intent
         state["phase"] = ConversationPhase.NORMAL
         # Clear all context from the interrupted task
-        state["pending_transfer"] = None
         state["confirmation_context"] = None
-        state["otp_attempts"] = 0
         state["interrupted_state"] = None
         # The graph will now route to the node for the `new_intent`.
         # We don't set a result here, as the next node will do it.
@@ -490,9 +505,13 @@ def interruption_confirmation_node(state: AgentState) -> AgentState:
         # User wants to continue the old task.
         # Restore the previous phase and context.
         state["phase"] = to_phase(interrupted_state.get("phase"))
-        state["intent"] = str(
-            state["phase"]
-        )  # intent should match the phase, e.g., "otp"
+        if state["phase"] == ConversationPhase.OTP:
+            state["intent"] = "otp"
+        elif state["phase"] == ConversationPhase.CONFIRMATION:
+            state["intent"] = "confirmation"
+        else:
+            state["intent"] = "unknown"
+
         state["pending_transfer"] = interrupted_state.get("pending_transfer")
         state["confirmation_context"] = interrupted_state.get("confirmation_context")
         state["otp_attempts"] = interrupted_state.get("otp_attempts", 0)
@@ -531,7 +550,7 @@ def unknown_node(state: AgentState) -> AgentState:
 
 # ---------- Flow Builder ----------
 def build_flow():
-    workflow = StateGraph(AgentState)
+    workflow = StateGraph(AgentState, config={"recursion_limit": 50})
 
     # --- Add Nodes ---
     workflow.add_node("voice", voice_node)
@@ -553,7 +572,6 @@ def build_flow():
         "classify_intent",
         lambda state: state.get("intent", "unknown"),
         {
-            
             "spend": "spend",
             "faq": "faq",
             "offers": "offers",
@@ -566,7 +584,7 @@ def build_flow():
     )
 
     # After handling an interruption, the graph should re-evaluate the new state
-    workflow.add_edge("interruption_confirmation", "classify_intent")
+    workflow.add_edge("interruption_confirmation", END)
 
     # All other terminal nodes end the flow for the current turn
     for node in [
@@ -580,7 +598,6 @@ def build_flow():
     ]:
         workflow.add_edge(node, END)
     workflow.add_edge("voice", END)
-
 
     return workflow.compile()
 

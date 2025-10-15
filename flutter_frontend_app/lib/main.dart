@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_frontend_app/widgets/chatbot_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/ai_display_data.dart';
-import 'screens/ai_bot_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +14,7 @@ void main() async {
   final displayData = AiDisplayData.fromJson(configJson);
 
   runApp(MaterialApp(
-    home: AiBotScreen(displayData: displayData),
+    home: ChatbotLauncher(displayData: displayData),
     theme: ThemeData(
       fontFamily: 'Outfit',
       textTheme: GoogleFonts.outfitTextTheme(),

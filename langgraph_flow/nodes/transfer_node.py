@@ -71,8 +71,21 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
         frequency = details.get("frequency", "one-time")
 
         beneficiary = transfer_tool.resolve_beneficiary(nickname)
-        if not beneficiary:
-            return {"status": "error", "message": f"Beneficiary '{nickname}' not found."}
+        # No matches
+        if beneficiary is None:
+            return {
+                "status": "error",
+                "message": f"No beneficiary found with the name '{nickname}'."
+            }
+
+        # Multiple matches (disambiguation)
+        if isinstance(beneficiary, dict) and beneficiary.get("status") == "multiple_matches":
+            return {
+                "status": "multiple_matches",
+                "message": beneficiary["message"],
+                "options": beneficiary["options"]
+            }
+
 
         otp_code = transfer_tool.generate_otp(user_id)
         return {

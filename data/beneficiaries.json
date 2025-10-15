@@ -2,13 +2,55 @@
   {
     "nickname": "mom",
     "name": "Mrs. Fatima Shah",
-    "account_number": "1234567890",
-    "ifsc": "HDFC0001234"
+    "account_number": "0289374562",
+    "ifsc": "HDFC0003487"
   },
   {
     "nickname": "dad",
     "name": "Mr. Ahmed Shah",
-    "account_number": "0987654321",
+    "account_number": "0289374218",
     "ifsc": "ICIC0004321"
+  },
+  {
+    "nickname": "Amy",
+    "name": "Ms. Amy Pareira",
+    "account_number": "0912897345",
+    "ifsc": "HDFC0008732"
+  },
+  {
+    "nickname": "John",
+    "name": "Mr. John Francis",
+    "account_number": "0912876543",
+    "ifsc": "ICIC0001234"
+  },
+  {
+    "nickname": "sister",
+    "name": "Ms. Daniya Shah",
+    "account_number": "0289374599",
+    "ifsc": "HDFC0005678"
+  },
+  {
+    "nickname": "brother",
+    "name": "Mr. Imran Shah",
+    "account_number": "0289374511",
+    "ifsc": "ICIC0008765"
+  },
+  {
+    "nickname": "friend",
+    "name": "Mr. Shayan Zameer",
+    "account_number": "0912897123",
+    "ifsc": "HDFC0004321"
+  },
+  {
+    "nickname": "Anita",
+    "name": "Ms. Anita Sharma",
+    "account_number": "0912876987",
+    "ifsc": "ICIC0003456"
+  },
+  {
+    "nickname": "Amy",
+    "name": "Ms. Amy Jones",
+    "account_number": "0912876987",
+    "ifsc": "ICIC0003456"
   }
 ]

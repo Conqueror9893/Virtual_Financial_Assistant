@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_frontend_app/widgets/custom_app_bar.dart';
-import 'package:flutter_frontend_app/widgets/bot_avatar_greeting.dart';
-import 'package:flutter_frontend_app/widgets/suggestion_chips.dart';
-import 'package:flutter_frontend_app/widgets/chat_input_field.dart';
-import 'package:flutter_frontend_app/widgets/ai_display_data.dart';
-import 'package:flutter_frontend_app/models/chat_message.dart';
-import 'package:flutter_frontend_app/widgets/user_message_bubble.dart';
-import 'package:flutter_frontend_app/widgets/bot_message_bubble.dart';
-import 'package:flutter_frontend_app/widgets/voice_chat_overlay.dart';
+import 'widgets/custom_app_bar.dart';
+import 'widgets/bot_avatar_greeting.dart';
+import 'widgets/suggestion_chips.dart';
+import 'widgets/chat_input_field.dart';
+import 'ai_display_data.dart';
+import 'models/chat_message.dart';
+import 'widgets/user_message_bubble.dart';
+import 'widgets/bot_message_bubble.dart';
+import 'widgets/voice_chat_overlay.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
