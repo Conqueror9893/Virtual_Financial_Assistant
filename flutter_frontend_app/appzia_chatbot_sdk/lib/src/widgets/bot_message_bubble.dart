@@ -1,4 +1,5 @@
 /// lib/widgets/bot_message_bubble.dart
+library;
 
 import 'package:flutter/material.dart';
 import 'spending_summary_bubble.dart';

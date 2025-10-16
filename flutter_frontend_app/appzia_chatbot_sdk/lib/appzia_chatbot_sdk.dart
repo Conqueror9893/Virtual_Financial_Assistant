@@ -1,4 +1,4 @@
-library ai_chatbot_sdk;
+library;
 
 export 'src/chatbot_launcher.dart';
 export 'src/ai_display_data.dart';

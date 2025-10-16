@@ -7,7 +7,7 @@ abstract class ChatMessage {
 // User message
 class UserMessage extends ChatMessage {
   final String text;
-  UserMessage({required String id, required this.text}) : super(id: id);
+  UserMessage({required super.id, required this.text});
 }
 
 // Bot message can be either text-only OR structured spending
@@ -21,7 +21,7 @@ class BotMessage extends ChatMessage {
   final Map<String, dynamic>? extraData; // for any additional data
 
   BotMessage({
-    required String id,
+    required super.id,
     this.text,
     this.title,
     this.totalSpent,
@@ -29,5 +29,5 @@ class BotMessage extends ChatMessage {
     this.spendingTrend,
     this.summary,
     this.extraData,
-  }) : super(id: id);
+  });
 }
