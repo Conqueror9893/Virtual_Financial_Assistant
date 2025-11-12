@@ -457,9 +457,24 @@ def handle_normal_phase(user_id, user_state, query, otp):
     save_user_state(user_id, user_state)
 
     user_query_for_llm = query or otp or ""
+    # ---------- Custom handling for FAQ intent ----------
+    if intent == "faq":
+        faq_data = resp if isinstance(resp, dict) else {}
+        answer = faq_data.get("answer", "Sorry, I couldn't find an answer.")
+        confidence = faq_data.get("confidence", 0.0)
 
+        sources = [
+            {"file": s.get("file"), "link": s.get("link")}
+            for s in faq_data.get("sources", [])
+        ]
+
+        chat_reply = {
+            "answer": answer,
+            "confidence": confidence,
+            "sources": sources,
+        }
     # Skip LLM formatting for spend intent (it's already well formatted)
-    if intent == "spends_check":
+    elif intent == "spends_check":
         chat_reply = (
             spend_structured_summary.get("structured_summary")
             or spend_structured_summary
@@ -490,6 +505,10 @@ def dispatch_intent(intent, user_id, query, otp):
         return requests.post(
             f"{API_BASE}/offers",
             json={"user_id": user_id, "query": query or "Show me offers"},
+        ).json()
+    elif intent == "faq":
+        return requests.post(
+            f"{API_BASE}/faq", json={"user_id": user_id, "query": query}
         ).json()
     else:
         return requests.post(

@@ -7,7 +7,8 @@ from utils.llm_connector import run_llm
 INTENTS = [
     "fund_transfer",
     "balance_check",
-    "spends_check"
+    "spends_check",
+    "faq",
 ]
 
 def classify_intent(state: Dict) -> Dict:

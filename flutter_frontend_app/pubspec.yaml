@@ -18,7 +18,9 @@ dependencies:
   google_fonts: ^6.1.0
   speech_to_text: ^6.6.0
   flutter_tts: ^3.8.5
-
+  flutter_markdown: ^0.7.3
+  url_launcher: ^6.3.0
+  video_player: ^2.5.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

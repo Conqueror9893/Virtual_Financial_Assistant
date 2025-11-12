@@ -1,6 +1,6 @@
 {
   "title": "Speaking to Ai Bot",
-  "backgroundGradient": ["0xFFFFAD80", "0xFFFFFEFD"],
+  "backgroundGradient": ["0xFFDAE3FF", "0xFFFFFEFD"],
   "avatarBgColor": "0xFFF87B2D",
   "avatarIcon": "assets/avatar.png",
   "greetingIntro": "Hi, I'm ",

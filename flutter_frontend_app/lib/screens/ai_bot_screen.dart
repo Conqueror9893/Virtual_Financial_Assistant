@@ -24,6 +24,7 @@ class AiBotScreen extends StatefulWidget {
 class _AiBotScreenState extends State<AiBotScreen> {
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
+  
   bool _showGreeting = true;
 
   @override
@@ -80,6 +81,7 @@ class _AiBotScreenState extends State<AiBotScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: const [0.0, 0.33],
+            
           ),
         ),
         child: SafeArea(
@@ -193,14 +195,39 @@ class _AiBotScreenState extends State<AiBotScreen> {
             : data['response'];
 
         if (botResponse is String) {
-          // Simple text
+          // Simple text fallback
           setState(() {
             _messages.add(BotMessage(
               id: DateTime.now().toIso8601String(),
               text: botResponse,
             ));
           });
-        } else if (botResponse is Map) {
+        } else if (botResponse is Map && botResponse.containsKey('answer')) {
+          // 🧩 Handle FAQ structured response
+          final answer = botResponse['answer'] ?? '';
+          final sources = (botResponse['sources'] as List?) ?? [];
+
+          // Combine the answer + sources into formatted text
+          String displayText = answer;
+
+          if (sources.isNotEmpty) {
+            displayText += '\n\n'; // Add spacing before sources
+            for (var src in sources) {
+              final file = src['file'] ?? '';
+              final link = src['link'] ?? '';
+
+              // Wrap filename as clickable link (Markdown style)
+              displayText += '[$file]($link)\n\n';
+            }
+          }
+
+          setState(() {
+            _messages.add(BotMessage(
+              id: DateTime.now().toIso8601String(),
+              text: displayText.trim(),
+            ));
+          });
+        } else if (botResponse is Map && botResponse.containsKey('recommendation')) {
           final message = botResponse['message']?.toString() ?? '';
           final recommendation = botResponse['recommendation']?.toString();
           final showForm = botResponse['show_transfer_form'] == true;

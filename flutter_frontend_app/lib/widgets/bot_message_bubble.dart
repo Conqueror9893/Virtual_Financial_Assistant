@@ -1,6 +1,6 @@
-/// lib/widgets/bot_message_bubble.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_frontend_app/widgets/spending_summary_bubble.dart';
 import 'package:flutter_frontend_app/widgets/contextual_suggestions.dart';
 import 'package:intl/intl.dart';
@@ -12,7 +12,7 @@ final logger = Logger("BotMessageBubble");
 
 class BotMessageBubble extends StatefulWidget {
   final BotMessage message;
-  final void Function(String)? onSendMessage; // 👈 Added callback
+  final void Function(String)? onSendMessage;
 
   const BotMessageBubble({
     super.key,
@@ -45,11 +45,9 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
       final initialAmount =
           (extra["amount"] is num) ? extra["amount"] * 1.0 : 5000.0;
 
-      // Store name locally
       _beneficiaryName ??= beneficiaryName;
 
       if (_submitted && _finalAmount != null && _finalDate != null) {
-        // ✅ Show confirmation card
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8),
           color: Colors.green.shade50,
@@ -64,7 +62,6 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
         );
       }
 
-      // 🧩 Otherwise show form
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
@@ -118,12 +115,12 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
         suggestions: suggestions,
         onSuggestionSelected: (selected) {
           logger.info("Contextual suggestion tapped: $selected");
-          widget.onSendMessage?.call(selected); // 👈 Calls parent send method
+          widget.onSendMessage?.call(selected);
         },
       );
     }
 
-    // 🧠 Default bot message handling...
+    // 🧠 Summary message (if title etc.)
     if (message.title != null) {
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -152,12 +149,30 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
       );
     }
 
-    // 💬 Text-only bot messages (default)
+    // 💬 Default text-only bot messages with clickable links
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Text(message.text ?? ""),
+        child: MarkdownBody(
+          data: message.text ?? "",
+          selectable: true,
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            a: const TextStyle(
+              color: Colors.blue,
+              decoration: TextDecoration.underline,
+            ),
+            p: const TextStyle(fontSize: 15),
+          ),
+          onTapLink: (text, href, title) async {
+            if (href != null) {
+              final uri = Uri.parse(href);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            }
+          },
+        ),
       ),
     );
   }

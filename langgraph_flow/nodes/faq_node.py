@@ -7,4 +7,4 @@ logger = get_logger("FAQNode")
 def handle_faq(user_id: int, query: str) -> dict:
     logger.info("FAQ query: %s", query)
     result = search_faq(query)
-    return {"query": query, "answer": result["answer"]}
+    return {"query": query, "answer": result["answer"], "confidence": result["confidence"], "sources": result["sources"]}
