@@ -12,12 +12,12 @@ class UserMessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         decoration: BoxDecoration(
-          color: const Color(0xFFF87B2D),
+          color: const Color(0xFFD5D1FF),
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Text(
           text,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.black),
         ),
       ),
     );

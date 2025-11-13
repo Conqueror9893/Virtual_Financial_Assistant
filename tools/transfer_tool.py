@@ -89,6 +89,7 @@ def resolve_beneficiary(nickname: str):
 
 
 def generate_otp(user_id: int) -> str:
+    user_id = int(user_id)
     otp = str(random.randint(100000, 999999))
     OTP_STORE[user_id] = {"otp": otp, "attempts": 0, "max_attempts": 3}
     logger.info("Generated OTP for user %s: %s", user_id, otp)
@@ -104,6 +105,7 @@ def validate_otp(user_id, otp: str) -> (bool, int):
     otp = otp.strip()
 
     record = OTP_STORE.get(user_id)
+    logger.info(f"Validating OTP for user_id={user_id}, otp={otp}, store={OTP_STORE}")
     if not record:
         return False, 0
 

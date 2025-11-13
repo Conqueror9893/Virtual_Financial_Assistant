@@ -31,7 +31,10 @@ flutter:
   assets:
     - assets/
     - lib/assets/ai_display_config.json
+    - lib/assets/bubbles_config.json
+    - lib/assets/animation_chatbot.mp4
     - assets/avatar.png
+    - assets/back_button.png
     - assets/payments.png
     - assets/spends.png
     - assets/transfer.png

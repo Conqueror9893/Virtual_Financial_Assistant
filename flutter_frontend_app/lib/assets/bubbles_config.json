@@ -1,0 +1,120 @@
+{
+  "categories": [
+    {
+      "label": "Accounts Services",
+      "icon": "9937",
+      "subcategories": [
+        {
+          "label": "View Account Balance",
+          "query": "What is my account balance?"
+        },
+        {
+          "label": "Account Details",
+          "query": "Show me my account details"
+        },
+        {
+          "label": "Transaction History",
+          "query": "Show my recent transactions"
+        }
+      ]
+    },
+    {
+      "label": "Payments & transfers",
+      "icon": "57556",
+      "subcategories": [
+        {
+          "label": "Send money to top payee",
+          "query": "Send money to top payee"
+        },
+        {
+          "label": "Schedule a transfer",
+          "query": "Schedule a transfer"
+        },
+        {
+          "label": "View transfer history",
+          "query": "View transfer history"
+        },
+        {
+          "label": "What is my monthly spending",
+          "query": "What is my monthly spending summary?"
+        },
+        {
+          "label": "Show account info for my saved payees",
+          "query": "Show account info for my saved payees"
+        }
+      ]
+    },
+    {
+      "label": "Personal finance & accounts",
+      "icon": "57576",
+      "subcategories": [
+        {
+          "label": "Budget Overview",
+          "query": "Show my budget overview"
+        },
+        {
+          "label": "Spending Insights",
+          "query": "Give me spending insights"
+        },
+        {
+          "label": "Financial Goals",
+          "query": "Show my financial goals"
+        }
+      ]
+    },
+    {
+      "label": "Savings & investment",
+      "icon": "57559",
+      "subcategories": [
+        {
+          "label": "Investment Portfolio",
+          "query": "Show my investment portfolio"
+        },
+        {
+          "label": "Savings Accounts",
+          "query": "Show my savings accounts"
+        },
+        {
+          "label": "Investment Recommendations",
+          "query": "Give me investment recommendations"
+        }
+      ]
+    },
+    {
+      "label": "Support & service",
+      "icon": "61432",
+      "subcategories": [
+        {
+          "label": "Contact Support",
+          "query": "How can I contact support?"
+        },
+        {
+          "label": "Report Issue",
+          "query": "I want to report an issue"
+        },
+        {
+          "label": "FAQs",
+          "query": "Show me frequently asked questions"
+        }
+      ]
+    },
+    {
+      "label": "Last electricity bill payment",
+      "icon": "61879",
+      "subcategories": [
+        {
+          "label": "View Last Bill",
+          "query": "Show my last electricity bill"
+        },
+        {
+          "label": "Pay Now",
+          "query": "I want to pay my electricity bill"
+        },
+        {
+          "label": "Billing History",
+          "query": "Show my electricity billing history"
+        }
+      ]
+    }
+  ]
+}

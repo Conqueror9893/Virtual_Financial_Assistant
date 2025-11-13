@@ -1,10 +1,10 @@
 {
-  "title": "Speaking to Ai Bot",
+  "title": "",
   "backgroundGradient": ["0xFFDAE3FF", "0xFFFFFEFD"],
-  "avatarBgColor": "0xFFF87B2D",
+  "avatarBgColor": "0xFFDAE3FF",
   "avatarIcon": "assets/avatar.png",
   "greetingIntro": "Hi, I'm ",
-  "botName": "Appzia",
+  "botName": "Nivi",
   "greetingLine1": "I can help you check your",
   "greetingLine2": "accounts, spending, or transfers",
   "suggestions": [
@@ -15,5 +15,5 @@
     { "icon": "assets/support.png", "label": "Support & service" },
     { "icon": "assets/search.png", "label": "Last electricity bill payment" }
   ],
-  "inputHint": "Chat with Appzia"
+  "inputHint": "Chat with Nivi..."
 }

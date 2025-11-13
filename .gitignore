@@ -1,3 +1,7 @@
+# Ignore all files in the images directory
 /frontend/chatbot-app-frontend/assets/images
 
-# Frontend build output
+# Ignore langraph flow old files
+langgraph_flow_old
+
+api/main_old.py

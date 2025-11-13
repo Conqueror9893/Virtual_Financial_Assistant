@@ -47,7 +47,7 @@ class BotAvatarGreeting extends StatelessWidget {
           displayData.greetingLine2,
           style: const TextStyle(
               fontSize: 16,
-              color: Color(0xFFF87B2D),
+              color: Color(0xFFDAE3FF),
               fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
