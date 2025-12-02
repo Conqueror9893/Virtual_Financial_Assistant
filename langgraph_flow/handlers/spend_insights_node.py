@@ -9,6 +9,7 @@ from tools import spend_insights
 from utils.logger import get_logger
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
+from .contextual_questions_node import handle_contextual_questions_node
 
 logger = get_logger("SpendInsightsNode")
 
@@ -235,12 +236,19 @@ def handle_spend_insight(user_id: int, query: str) -> dict:
 
     # 🧠 New: Build structured analysis
     structured = _build_structured_spend_summary(query, details, result)
+    contextual_response = handle_contextual_questions_node(
+        user_id=user_id,
+        last_query=query,
+        last_response=structured["summary_title"],
+    )
+    contextual_questions = contextual_response.get("contextual_questions", [])
 
     return {
         "query": query,
         "details": details,
         "result": result,
         "structured_summary": structured,
+        "contextual_questions": contextual_questions,
     }
 
 

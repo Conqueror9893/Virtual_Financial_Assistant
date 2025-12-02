@@ -36,15 +36,17 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
   Widget build(BuildContext context) {
     final message = widget.message;
     logger.info(
-        "Rendering bot message: ${message.text}, extraData: ${message.extraData}");
+      "Rendering bot message: ${message.text}, extraData: ${message.extraData}",
+    );
 
     // 🧾 Transfer form inline
     if (message.text == "[SHOW_TRANSFER_FORM_BUTTON]") {
       final extra = message.extraData ?? {};
       final beneficiaryName =
           extra["beneficiary_name"]?.toString() ?? "Beneficiary";
-      final initialAmount =
-          (extra["amount"] is num) ? extra["amount"] * 1.0 : 5000.0;
+      final initialAmount = (extra["amount"] is num)
+          ? extra["amount"] * 1.0
+          : 5000.0;
 
       // Store name locally
       _beneficiaryName ??= beneficiaryName;
@@ -113,8 +115,9 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
     // 💡 Contextual suggestions
     if (message.text == "[CONTEXTUAL_QUESTIONS]" &&
         message.extraData?["questions"] != null) {
-      final suggestions =
-          List<String>.from(message.extraData!["questions"] ?? []);
+      final suggestions = List<String>.from(
+        message.extraData!["questions"] ?? [],
+      );
       return ContextualSuggestions(
         suggestions: suggestions,
         onSuggestionSelected: (selected) {
@@ -139,7 +142,8 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
               ),
               if (message.totalSpent != null)
                 Text(
-                    "Total Spent: USD ${message.totalSpent!.toStringAsFixed(0)}"),
+                  "Total Spent: USD ${message.totalSpent!.toStringAsFixed(0)}",
+                ),
               if (message.breakdown != null)
                 ...message.breakdown!.entries.map(
                   (e) => Text("${e.key}: USD ${e.value.toStringAsFixed(0)}"),

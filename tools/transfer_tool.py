@@ -8,6 +8,7 @@ from utils.logger import get_logger
 
 logger = get_logger("TransferTool")
 BENEFICIARIES_PATH = "data/beneficiaries.json"
+ACCOUNTS_PATH = "data/accounts.json"
 
 # Structure: { user_id: { "otp": "123456", "attempts": 0, "max_attempts": 3 } }
 OTP_STORE = {}
@@ -67,6 +68,7 @@ def resolve_beneficiary(nickname: str):
     if len(matches) == 1:
         logger.info("Single match found for nickname '%s'", nickname)
         return matches[0]
+    
     elif len(matches) > 1:
         # Return special marker to trigger clarification in frontend
         return {
@@ -121,7 +123,30 @@ def validate_otp(user_id, otp: str) -> (bool, int):
 
     return False, attempts_left
 
-
+def load_accounts(user_id: int):
+    if not os.path.exists(ACCOUNTS_PATH):
+        logger.warning("Accounts file not found at %s", ACCOUNTS_PATH)
+        return ['Savings', 'Current']  # Provide fallback
+    try:
+        with open(ACCOUNTS_PATH, 'r') as f:
+            accounts = json.load(f)
+        # Filter accounts belonging to the given user_id
+        user_accounts = [
+            a["account_type"]
+            for a in accounts
+            if a.get("user_id") == user_id and "account_type" in a
+        ]
+        # If user has no accounts, return defaults
+        if not user_accounts:
+            logger.warning(f"No accounts found for user_id={user_id}")
+            return ["Savings", "Current"]
+        
+        # Normalize (capitalize)
+        return [acc.capitalize() for acc in user_accounts]
+    except Exception as e:
+        logger.error('Failed to load accounts.json: %s', e)
+        # Provide fallback
+        return ['Savings', 'Current']
 
 def perform_transfer(user_id: int, beneficiary: dict, amount: float) -> dict:
     logger.info("Performing transfer of %.2f to %s", amount, beneficiary["name"])

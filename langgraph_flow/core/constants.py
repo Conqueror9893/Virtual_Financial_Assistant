@@ -25,8 +25,11 @@ class IntentType(str, Enum):
     """Valid user intents in the system."""
     SPEND = "spend"
     FAQ = "faq"
-    OFFERS = "offers"
+    # OFFERS = "offers"
     TRANSFER = "transfer"
+    BENEFICIARY_SELECTION = "beneficiary_selection"  # NEW
+    ACCOUNT_SELECTION = "account_selection"          # NEW
+    TRANSFER_SUMMARY = "transfer_summary"            # NEW
     OTP = "otp"
     CONFIRMATION = "confirmation"
     INTERRUPTION_CONFIRMATION = "interruption_confirmation"
@@ -37,7 +40,7 @@ class IntentType(str, Enum):
 VALID_INTENTS: Set[str] = {
     IntentType.SPEND,
     IntentType.FAQ,
-    IntentType.OFFERS,
+    # IntentType.OFFERS,
     IntentType.TRANSFER,
 }
 

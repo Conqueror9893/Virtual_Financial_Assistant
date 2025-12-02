@@ -1,12 +1,12 @@
 # langraph_flow/services/intent_classifier.py
 
-import logging
+from utils.logger import get_logger
 from typing import Optional
 from ..core.constants import IntentType, VALID_INTENTS
 from utils.llm_connector import run_llm
+from utils.prompts import INTENT_CLASSIFICATION_PROMPT
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class IntentClassifier:
@@ -16,7 +16,7 @@ class IntentClassifier:
     KEYWORD_FALLBACKS = {
         IntentType.TRANSFER: ["transfer", "send", "pay", "remit"],
         IntentType.SPEND: ["spend", "transactions", "spending", "expense"],
-        IntentType.OFFERS: ["offer", "discount", "promo", "deal", "coupon"],
+        # IntentType.OFFERS: ["offer", "discount", "promo", "deal", "coupon"],
         IntentType.FAQ: ["how", "what", "why", "when", "where", "faq", "help"],
     }
 
@@ -33,7 +33,9 @@ class IntentClassifier:
 
         # Try LLM classification first
         llm_result = IntentClassifier._classify_with_llm(user_input)
+        logger.info(f"LLM result: {llm_result}")
         if llm_result and llm_result in VALID_INTENTS:
+            logger.info(llm_result)
             return llm_result
 
         # Fallback to keyword heuristics
@@ -42,9 +44,7 @@ class IntentClassifier:
     @staticmethod
     def _classify_with_llm(user_input: str) -> Optional[str]:
         """Try to classify using LLM."""
-        prompt = f"""Classify this user query into exactly one category: spend, faq, offers, transfer, or unknown.
-Query: "{user_input}"
-Return ONLY the single-word category label, nothing else."""
+        prompt = INTENT_CLASSIFICATION_PROMPT.format(user_input=user_input)
 
         try:
             raw = run_llm(prompt)

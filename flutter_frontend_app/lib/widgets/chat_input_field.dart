@@ -21,6 +21,37 @@ class ChatInputField extends StatefulWidget {
 }
 
 class _ChatInputFieldState extends State<ChatInputField> {
+  double _textFieldHeight = 44.0; // Base height (single line)
+  final double _minHeight = 44.0; // Single line
+  final double _maxHeight = 100.0; // Max height for 3 lines + scrolling
+  final double _lineHeight = 24.0; // Height per line
+
+  @override
+  void initState() {
+    super.initState();
+    widget.inputController.addListener(_updateTextFieldHeight);
+  }
+
+  @override
+  void dispose() {
+    widget.inputController.removeListener(_updateTextFieldHeight);
+    super.dispose();
+  }
+
+  void _updateTextFieldHeight() {
+    final text = widget.inputController.text;
+    final lines = '\n'.allMatches(text).length + 1;
+
+    double newHeight = _minHeight + ((lines - 1) * _lineHeight);
+    newHeight = newHeight.clamp(_minHeight, _maxHeight);
+
+    if (_textFieldHeight != newHeight) {
+      setState(() {
+        _textFieldHeight = newHeight;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -36,6 +67,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Plus icon
           GestureDetector(
@@ -57,6 +89,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
           // Input field
           Expanded(
             child: Container(
+              height: _textFieldHeight,
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(24),
@@ -67,6 +100,10 @@ class _ChatInputFieldState extends State<ChatInputField> {
               ),
               child: TextField(
                 controller: widget.inputController,
+                maxLines: null,
+                minLines: 1,
+                expands: false,
+                scrollPhysics: const ClampingScrollPhysics(),
                 decoration: InputDecoration(
                   hintText: widget.hintText,
                   hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -74,17 +111,17 @@ class _ChatInputFieldState extends State<ChatInputField> {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   suffixIcon: widget.isMicListening
-                      ? Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
+                      ? const Padding(
+                          padding: EdgeInsets.only(right: 8.0),
                           child: SizedBox(
                             width: 24,
                             height: 24,
                             child: Padding(
-                              padding: const EdgeInsets.all(6.0),
+                              padding: EdgeInsets.all(6.0),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.orange.shade500,
+                                valueColor: AlwaysStoppedAnimation(
+                                  Color.fromARGB(255, 152, 130, 253),
                                 ),
                               ),
                             ),
@@ -111,14 +148,14 @@ class _ChatInputFieldState extends State<ChatInputField> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: widget.isMicListening
-                    ? Colors.orange.shade100
+                    ? const Color.fromARGB(255, 214, 214, 238)
                     : Colors.grey.shade100,
               ),
               child: Icon(
                 widget.isMicListening ? Icons.mic : Icons.mic_none,
                 color: widget.isMicListening
-                    ? Colors.orange.shade600
-                    : Colors.grey.shade600,
+                    ? const Color(0xFF5B5FB9)
+                    : const Color.fromARGB(255, 118, 144, 184),
                 size: 20,
               ),
             ),
@@ -148,9 +185,5 @@ class _ChatInputFieldState extends State<ChatInputField> {
     );
   }
 
-  @override
-  void dispose() {
-    widget.inputController.dispose();
-    super.dispose();
-  }
+  // ✅ Removed dispose() method - parent widget owns the controller
 }

@@ -104,6 +104,6 @@ if __name__ == "__main__":
     result = handle_contextual_questions_node(
         user_id=1,
         last_query="Show me my coffee spending last month",
-        last_response="You spent ₹7.58 in total at Coffee shops."
+        last_response="You spent INR7.58 in total at Coffee shops."
     )
     print(result)

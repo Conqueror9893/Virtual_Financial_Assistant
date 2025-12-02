@@ -422,6 +422,9 @@ def handle_normal_phase_route(user_id: str, user_state: dict, query: str) -> tup
     try:
         user_state["user_input"] = query
         user_state["intent"] = IntentType.UNKNOWN  # Let classifier determine
+        logger.info(f"User input set to: {query}")
+        logger.info(f"Intent set to UNKNOWN for classification")
+        logger.info(f"Invoking graph for user {user_id}")
         
         # Invoke graph - it will classify and route
         result = graph.invoke(user_state)
@@ -458,7 +461,7 @@ def transfer():
     - Confirmation phase
     
     Request:
-        {"user_id": 1, "query": "Transfer $100 to John", "otp": "123456"}
+        {"user_id": 1, "query": "Transfer USD 100 to John", "otp": "123456"}
     
     Response:
         {"status": "ok", "response": {...}}

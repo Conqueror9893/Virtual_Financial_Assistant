@@ -1,4 +1,4 @@
-#tools/faq_tool.py
+# tools/faq_tool.py
 
 import os
 import fitz  # PyMuPDF
@@ -9,6 +9,7 @@ from utils.logger import get_logger
 from utils.llm_connector import run_llm
 from sentence_transformers import SentenceTransformer
 import chromadb
+from utils.prompts import FAQ_ANSWERING_PROMPT
 
 logger = get_logger("FAQTool")
 
@@ -18,6 +19,7 @@ COLLECTION_NAME = "banking_faqs"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # ------------------ HELPERS ------------------ #
+
 
 def extract_text_from_pdf(path: str) -> List[Dict[str, str]]:
     """Extract text per page & paragraph from a PDF file."""
@@ -29,14 +31,16 @@ def extract_text_from_pdf(path: str) -> List[Dict[str, str]]:
             paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
             for idx, para in enumerate(paragraphs):
                 snippet = para[:200].replace("\n", " ")
-                results.append({
-                    "text": para,
-                    "file": os.path.basename(path),
-                    "page": page_num,
-                    "para": idx + 1,
-                    "snippet": snippet,
-                    "source_path": path,
-                })
+                results.append(
+                    {
+                        "text": para,
+                        "file": os.path.basename(path),
+                        "page": page_num,
+                        "para": idx + 1,
+                        "snippet": snippet,
+                        "source_path": path,
+                    }
+                )
         doc.close()
     except Exception as e:
         logger.exception(f"Error reading PDF {path}: {e}")
@@ -53,14 +57,16 @@ def extract_text_from_docx(path: str) -> List[Dict[str, str]]:
             if not text:
                 continue
             snippet = text[:200].replace("\n", " ")
-            results.append({
-                "text": text,
-                "file": os.path.basename(path),
-                "page": None,
-                "para": idx + 1,
-                "snippet": snippet,
-                "source_path": path,
-            })
+            results.append(
+                {
+                    "text": text,
+                    "file": os.path.basename(path),
+                    "page": None,
+                    "para": idx + 1,
+                    "snippet": snippet,
+                    "source_path": path,
+                }
+            )
     except Exception as e:
         logger.exception(f"Error reading DOCX {path}: {e}")
     return results
@@ -78,14 +84,16 @@ def extract_text_from_excel(path: str) -> List[Dict[str, str]]:
                 if not row_text.strip():
                     continue
                 snippet = row_text[:200].replace("\n", " ")
-                results.append({
-                    "text": row_text,
-                    "file": f"{os.path.basename(path)}:{sheet_name}",
-                    "page": None,
-                    "para": row_idx + 1,
-                    "snippet": snippet,
-                    "source_path": path,
-                })
+                results.append(
+                    {
+                        "text": row_text,
+                        "file": f"{os.path.basename(path)}:{sheet_name}",
+                        "page": None,
+                        "para": row_idx + 1,
+                        "snippet": snippet,
+                        "source_path": path,
+                    }
+                )
     except Exception as e:
         logger.exception(f"Error reading Excel {path}: {e}")
     return results
@@ -113,10 +121,13 @@ def load_all_documents() -> List[Dict[str, str]]:
 
 # ------------------ CHROMADB SETUP ------------------ #
 
+
 def get_chroma_collection():
     client = chromadb.PersistentClient(path=CHROMA_PATH)
     if COLLECTION_NAME not in [c.name for c in client.list_collections()]:
-        collection = client.create_collection(name=COLLECTION_NAME, metadata={"source": "faq_docs"})
+        collection = client.create_collection(
+            name=COLLECTION_NAME, metadata={"source": "faq_docs"}
+        )
         logger.info("Created new ChromaDB collection: %s", COLLECTION_NAME)
     else:
         collection = client.get_collection(COLLECTION_NAME)
@@ -137,21 +148,27 @@ def build_vector_store():
         existing = collection.get()
         if existing and len(existing["ids"]) > 0:
             collection.delete(ids=existing["ids"])
-            logger.info(f"Cleared {len(existing['ids'])} old items from Chroma collection.")
+            logger.info(
+                f"Cleared {len(existing['ids'])} old items from Chroma collection."
+            )
     except Exception as e:
         logger.warning(f"Could not clear existing data: {e}")
 
-    embeddings = model.encode([c["text"] for c in chunks], convert_to_numpy=True).tolist()
+    embeddings = model.encode(
+        [c["text"] for c in chunks], convert_to_numpy=True
+    ).tolist()
     # ✅ Prepare clean metadata — Chroma only accepts str, int, float, bool
     metadatas = []
     for c in chunks:
-        metadatas.append({
-            "file": str(c.get("file") or ""),
-            "page": int(c.get("page") or 0),
-            "para": int(c.get("para") or 0),
-            "snippet": str(c.get("snippet") or ""),
-            "source_path": str(c.get("source_path") or ""),
-        })
+        metadatas.append(
+            {
+                "file": str(c.get("file") or ""),
+                "page": int(c.get("page") or 0),
+                "para": int(c.get("para") or 0),
+                "snippet": str(c.get("snippet") or ""),
+                "source_path": str(c.get("source_path") or ""),
+            }
+        )
 
     collection.add(
         ids=[f"doc_{i}" for i in range(len(chunks))],
@@ -159,7 +176,6 @@ def build_vector_store():
         documents=[c["text"] for c in chunks],
         metadatas=metadatas,
     )
-
 
     logger.info("Vector store built successfully with %d entries.", len(chunks))
     return collection
@@ -179,6 +195,7 @@ def ensure_vector_store():
 
 
 # ------------------ RETRIEVAL ------------------ #
+
 
 def search_faq(query: str) -> Dict[str, str]:
     """Search all stored docs, return top-2 relevant answers with source snippets."""
@@ -212,29 +229,20 @@ def search_faq(query: str) -> Dict[str, str]:
         source_link = meta["source_path"]
         page_info = f"(page {meta['page']})" if meta["page"] else ""
         snippet = meta["snippet"]
-        sources.append({
-            "file": meta["file"],
-            "link": source_link,
-            "page": meta["page"],
-            "para": meta["para"],
-            "snippet": snippet,
-            "confidence": confidence
-        })
+        sources.append(
+            {
+                "file": meta["file"],
+                "link": source_link,
+                "page": meta["page"],
+                "para": meta["para"],
+                "snippet": snippet,
+                "confidence": confidence,
+            }
+        )
 
     # Summarize best answer using LLM, grounded in retrieved snippets
     context = "\n\n".join([s["snippet"] for s in sources])
-    prompt = f"""
-    You are a helpful and concise banking FAQ assistant.
-    The user asked: "{query}".
-    Based strictly on the information provided below, give a clear and direct answer.
-    Do NOT mention documents, sources, file names, or any references. Do NOT provide document names or links.
-    Only provide the factual answer.
-
-    Context:
-    {context}
-
-    Return only the answer, without repeating the question.
-    """
+    prompt = FAQ_ANSWERING_PROMPT.format(query=query, context=context)
     logger.info("Generating answer with LLM for query: %s", query)
     logger.debug("LLM Prompt: %s", prompt)
     logger.debug("Context used for LLM: %s", context)
@@ -245,8 +253,4 @@ def search_faq(query: str) -> Dict[str, str]:
     logger.info("LLM Answer: %s", llm_answer)
     logger.info("Top confidence score: %.3f", top_conf)
     logger.info("Sources used: %s", sources)
-    return {
-        "answer": llm_answer,
-        "confidence": top_conf,
-        "sources": sources
-    }
+    return {"answer": llm_answer, "confidence": top_conf, "sources": sources}

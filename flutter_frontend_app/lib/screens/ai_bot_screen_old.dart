@@ -57,9 +57,6 @@ class _AiBotScreenState extends State<AiBotScreen>
   String? _pendingRecommendationId;
   String? _pendingBeneficiaryId;
 
-  // Loading state
-  bool _isLoadingResponse = false;
-
   @override
   void initState() {
     super.initState();
@@ -189,13 +186,6 @@ class _AiBotScreenState extends State<AiBotScreen>
     }
   }
 
-  // Helper getter to check if in transfer flow
-  bool get _isInTransferFlow =>
-      _currentPhase == 'ConversationPhase.ACCOUNT_SELECTION' ||
-      _currentPhase == 'ConversationPhase.TRANSFER_SUMMARY' ||
-      _currentPhase == 'ConversationPhase.OTP' ||
-      _currentPhase == 'ConversationPhase.CONFIRMATION';
-
   @override
   Widget build(BuildContext context) {
     const double fixedWidth = 412;
@@ -269,9 +259,7 @@ class _AiBotScreenState extends State<AiBotScreen>
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 24.0, vertical: 16),
-                        itemCount: _showGreeting
-                            ? 1
-                            : _messages.length + (_isLoadingResponse ? 1 : 0),
+                        itemCount: _showGreeting ? 1 : _messages.length,
                         itemBuilder: (context, index) {
                           if (_showGreeting) {
                             return Column(
@@ -318,11 +306,6 @@ class _AiBotScreenState extends State<AiBotScreen>
                             );
                           }
 
-                          // Show loading message if applicable
-                          if (_isLoadingResponse && index == _messages.length) {
-                            return _buildThinkingMessage();
-                          }
-
                           final message = _messages[index];
                           if (message is UserMessage) {
                             return UserMessageBubble(text: message.text);
@@ -343,10 +326,8 @@ class _AiBotScreenState extends State<AiBotScreen>
                         },
                       ),
                     ),
-                    // ✅ Show suggestions ONLY when not loading and not in transfer flow
-                    if (!_isLoadingResponse &&
-                        !_isInTransferFlow &&
-                        _lastContextualQuestions.isNotEmpty)
+                    // ✅ NEW: Contextual suggestions bar
+                    if (_lastContextualQuestions.isNotEmpty)
                       SuggestionBar(
                         suggestions: _lastContextualQuestions,
                         onSuggestionTap: (q) {
@@ -373,28 +354,6 @@ class _AiBotScreenState extends State<AiBotScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ✅ NEW: Build "Nivi is thinking..." with streaming animation
-  Widget _buildThinkingMessage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          _StreamingDots(),
-          const SizedBox(width: 12),
-          const Text(
-            "Nivi is thinking...",
-            style: TextStyle(
-              fontSize: 15,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -464,11 +423,12 @@ class _AiBotScreenState extends State<AiBotScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) {
+        // Match the bot screen typical size
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              maxWidth: 412,
-              maxHeight: 700,
+              maxWidth: 412, // Typical mobile screen width
+              maxHeight: 700, // Leave space for status/app bars
             ),
             child: Material(
               borderRadius: BorderRadius.circular(16),
@@ -480,6 +440,7 @@ class _AiBotScreenState extends State<AiBotScreen>
                     (amount, frequency, installments, remarks, startDate) {
                   logger.info(
                       'Recurring transfer setup: $amount, $frequency, $installments installments, "$remarks", starting $startDate');
+                  // You can send this data to backend here
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -504,8 +465,6 @@ class _AiBotScreenState extends State<AiBotScreen>
       _showGreeting = false;
       _showVideo = false;
       _showBubbles = false;
-      // ✅ Set loading to true when sending
-      _isLoadingResponse = true;
     });
 
     final isOtp = RegExp(r'^\d{4,8}$').hasMatch(text.trim());
@@ -543,8 +502,6 @@ class _AiBotScreenState extends State<AiBotScreen>
               text: "Error: Server returned ${response.statusCode}",
             ),
           );
-          // ✅ Set loading to false
-          _isLoadingResponse = false;
         });
       }
     } catch (e) {
@@ -555,13 +512,50 @@ class _AiBotScreenState extends State<AiBotScreen>
             text: "Error: Failed to connect to server.\n$e",
           ),
         );
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
     }
 
     _scrollToBottom();
   }
+
+  // void _handleApiResponse(Map<String, dynamic> data) {
+  //   final phase = data['phase'] as String?;
+  //   final responseData = data['response'] as Map<String, dynamic>?;
+
+  //   if (responseData == null) {
+  //     setState(() {
+  //       _messages.add(BotMessage(
+  //         id: DateTime.now().toIso8601String(),
+  //         text: "Unexpected response format from server.",
+  //       ));
+  //     });
+  //     return;
+  //   }
+
+  //   setState(() {
+  //     _currentPhase = phase;
+  //   });
+
+  //   // Handle different phases
+  //   if (phase == 'ConversationPhase.ACCOUNT_SELECTION') {
+  //     _handleAccountSelectionPhase(responseData);
+  //   } else if (phase == 'ConversationPhase.TRANSFER_SUMMARY') {
+  //     _handleTransferSummaryPhase(responseData);
+  //   } else if (phase == 'ConversationPhase.OTP') {
+  //     _handleOtpPhase(responseData);
+  //   } else if (phase == 'ConversationPhase.CONFIRMATION') {
+  //     _handleConfirmationPhase(responseData);
+  //   } else if (phase == 'ConversationPhase.NORMAL') {
+  //     logger.info("Handling normal phase response");
+  //     logger.info("Response Data: $responseData");
+
+  //     _handleLegacyResponse(responseData);
+  //   } else {
+  //     // Legacy handling for old response formats
+  //     logger.info("Handling legacy response format");
+  //     _handleLegacyResponse(responseData);
+  //   }
+  // }
 
   void _handleApiResponse(Map<String, dynamic> data) {
     final phase = data['phase'] as String?;
@@ -573,8 +567,6 @@ class _AiBotScreenState extends State<AiBotScreen>
           id: DateTime.now().toIso8601String(),
           text: "Unexpected response format from server.",
         ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
       return;
     }
@@ -598,6 +590,7 @@ class _AiBotScreenState extends State<AiBotScreen>
     } else if (phase == 'ConversationPhase.CONFIRMATION') {
       _handleConfirmationPhase(responseData);
     } else {
+      // Unknown phase - try legacy handler
       logger.info("Unknown phase: $phase, using legacy handler");
       _handleLegacyResponse(responseData);
     }
@@ -614,10 +607,6 @@ class _AiBotScreenState extends State<AiBotScreen>
         phase: 'ConversationPhase.ACCOUNT_SELECTION',
         options: options,
       ));
-      // ✅ Clear contextual questions when in transfer flow
-      _lastContextualQuestions = [];
-      // ✅ Set loading to false
-      _isLoadingResponse = false;
     });
   }
 
@@ -632,10 +621,6 @@ class _AiBotScreenState extends State<AiBotScreen>
         phase: 'ConversationPhase.TRANSFER_SUMMARY',
         transferSummary: summary,
       ));
-      // ✅ Clear contextual questions when in transfer flow
-      _lastContextualQuestions = [];
-      // ✅ Set loading to false
-      _isLoadingResponse = false;
     });
   }
 
@@ -650,10 +635,6 @@ class _AiBotScreenState extends State<AiBotScreen>
         phase: 'ConversationPhase.OTP',
         otpRequired: otpRequired,
       ));
-      // ✅ Clear contextual questions when in transfer flow
-      _lastContextualQuestions = [];
-      // ✅ Set loading to false
-      _isLoadingResponse = false;
     });
   }
 
@@ -678,16 +659,118 @@ class _AiBotScreenState extends State<AiBotScreen>
         recommendation: recommendation,
         recommendationId: recommendationId,
       ));
-      // ✅ Clear contextual questions when in transfer flow
-      _lastContextualQuestions = [];
-      // ✅ Set loading to false
-      _isLoadingResponse = false;
     });
   }
 
-  void _handleLegacyResponse(Map<String, dynamic> responseData) {
+  // void _handleNormalPhase(Map<String, dynamic> responseData) {
+  //   final message = responseData['message'] as String?;
+  //   final action = responseData['action'] as String?;
+  //   final beneficiaryId = responseData['beneficiary_id'] as String?;
+  //   final recommendationId = responseData['recommendation_id'] as String?;
+
+  //   setState(() {
+  //     _messages.add(BotMessage(
+  //       id: DateTime.now().toIso8601String(),
+  //       text: message,
+  //       phase: 'ConversationPhase.NORMAL',
+  //       action: action,
+  //       beneficiaryId: beneficiaryId,
+  //       recommendationId: recommendationId,
+  //     ));
+  //   });
+  // }
+
+  // void _handleLegacyResponse(Map<String, dynamic> responseData) {
+  //   // Handle old response format for backward compatibility
+  //   final botResponse = responseData['response'] ?? responseData;
+
+  //   if (botResponse is String) {
+  //     setState(() {
+  //       _messages.add(BotMessage(
+  //         id: DateTime.now().toIso8601String(),
+  //         text: botResponse,
+  //       ));
+  //     });
+  //   } else if (botResponse is Map && botResponse.containsKey('answer')) {
+  //     final answer = botResponse['answer'] ?? '';
+  //     final sources = (botResponse['sources'] as List?) ?? [];
+  //     String displayText = answer;
+  //     if (sources.isNotEmpty) {
+  //       displayText += '\n\n';
+  //       for (var src in sources) {
+  //         final file = src['file'] ?? '';
+  //         final link = src['link'] ?? '';
+  //         displayText += '[$file]($link)\n\n';
+  //       }
+  //     }
+  //     setState(() {
+  //       _messages.add(BotMessage(
+  //         id: DateTime.now().toIso8601String(),
+  //         text: displayText.trim(),
+  //       ));
+  //     });
+  //   } else if (botResponse is Map &&
+  //       botResponse.containsKey('breakdown_merchants')) {
+  //     final summary = botResponse;
+  //     setState(() {
+  //       _messages.add(BotMessage(
+  //         id: "spend_summary_${DateTime.now().toIso8601String()}",
+  //         text: "[SPEND_INSIGHTS_SUMMARY]",
+  //         extraData: {
+  //           "summary_title": summary["summary_title"],
+  //           "total_spent": summary["total_spent"],
+  //           "chart_data": summary["chart_data"],
+  //           "breakdown_merchants": summary["breakdown_merchants"],
+  //           "trend_insights": summary["trend_insights"],
+  //         },
+  //       ));
+  //     });
+  //   } else if (botResponse is Map &&
+  //       botResponse.containsKey('recommendation')) {
+  //     final message = botResponse['message']?.toString() ?? '';
+  //     final recommendation = botResponse['recommendation']?.toString();
+
+  //     if (message.isNotEmpty) {
+  //       setState(() {
+  //         _messages.add(BotMessage(
+  //           id: DateTime.now().toIso8601String(),
+  //           text: message,
+  //         ));
+  //       });
+  //     }
+
+  //     if (recommendation != null && recommendation.isNotEmpty) {
+  //       setState(() {
+  //         _messages.add(BotMessage(
+  //           id: "recommendation_${DateTime.now().toIso8601String()}",
+  //           text: recommendation,
+  //           extraData: {
+  //             "recommendation_id": botResponse['recommendation_id'],
+  //           },
+  //         ));
+  //       });
+  //     }
+  //   }
+
+  //   // Handle contextual questions
+  //   if (responseData['contextual_questions'] != null &&
+  //       responseData['contextual_questions'] is List) {
+  //     final List<String> questions =
+  //         List<String>.from(responseData['contextual_questions']);
+  //     setState(() {
+  //       _messages.add(BotMessage(
+  //         id: "contextual_${DateTime.now().toIso8601String()}",
+  //         text: "[CONTEXTUAL_QUESTIONS]",
+  //         extraData: {"questions": questions},
+  //       ));
+  //     });
+  //   }
+  // }
+
+  void _handleLegacyResponse(Map<dynamic, dynamic> responseData) {
     // Handle old response format for backward compatibility
-    logger.info("Response Data: $responseData");
+
+    // Check if this is a spending summary response (nested in structured_summary)
     if (responseData.containsKey('structured_summary') &&
         responseData['structured_summary'] is Map) {
       _handleSpendingSummaryResponse(responseData);
@@ -702,8 +785,6 @@ class _AiBotScreenState extends State<AiBotScreen>
           id: DateTime.now().toIso8601String(),
           text: botResponse,
         ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
     } else if (botResponse is Map && botResponse.containsKey('answer')) {
       final answer = botResponse['answer'] ?? '';
@@ -722,11 +803,10 @@ class _AiBotScreenState extends State<AiBotScreen>
           id: DateTime.now().toIso8601String(),
           text: displayText.trim(),
         ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
     } else if (botResponse is Map &&
         botResponse.containsKey('breakdown_merchants')) {
+      // Old format spending summary (for backward compatibility)
       final summary = botResponse;
       setState(() {
         _messages.add(BotMessage(
@@ -740,14 +820,11 @@ class _AiBotScreenState extends State<AiBotScreen>
             "trend_insights": summary["trend_insights"],
           },
         ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
     } else if (botResponse is Map &&
         botResponse.containsKey('recommendation')) {
       final message = botResponse['message']?.toString() ?? '';
       final recommendation = botResponse['recommendation']?.toString();
-
       if (message.isNotEmpty) {
         setState(() {
           _messages.add(BotMessage(
@@ -756,7 +833,6 @@ class _AiBotScreenState extends State<AiBotScreen>
           ));
         });
       }
-
       if (recommendation != null && recommendation.isNotEmpty) {
         setState(() {
           _messages.add(BotMessage(
@@ -766,81 +842,35 @@ class _AiBotScreenState extends State<AiBotScreen>
               "recommendation_id": botResponse['recommendation_id'],
             },
           ));
-          // ✅ Set loading to false
-          _isLoadingResponse = false;
-        });
-      } else {
-        setState(() {
-          _isLoadingResponse = false;
         });
       }
-    } else if (responseData.containsKey('action') &&
-        responseData['action'] == 'show_transfer_form') {
-      final String beneficiaryId = responseData['beneficiary_id'] ?? '';
-      final String message =
-          responseData['message'] ?? 'Setup recurring transfer';
-      final String recommendationId = responseData['recommendation_id'] ?? '';
-
-      // Call your existing open transfer form handler
-      _handleOpenTransferForm(
-        message, // Assuming message contains beneficiary name or text you want to show
-        beneficiaryId,
-        100.0, // You may adapt this to pass amount if in the response
-      );
-
-      setState(() {
-        _messages.add(BotMessage(
-          id: DateTime.now().toIso8601String(),
-          text: message,
-          phase: 'ConversationPhase.NORMAL',
-          action: 'show_transfer_form',
-          beneficiaryId: beneficiaryId,
-          recommendationId: recommendationId,
-        ));
-        _isLoadingResponse = false;
-        _lastContextualQuestions = [];
-      });
-      return; // Important: exit early since transfer form handled
-    } else if (responseData.containsKey('message')) {
-      final message = responseData['message']?.toString() ?? '';
-      setState(() {
-        _messages.add(BotMessage(
-          id: DateTime.now().toIso8601String(),
-          text: message,
-        ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
-      });
     } else {
+      // Fallback for unknown format
       setState(() {
         _messages.add(BotMessage(
           id: DateTime.now().toIso8601String(),
           text: "Unexpected response format from server.",
         ));
-        // ✅ Set loading to false
-        _isLoadingResponse = false;
       });
     }
-    logger.info("contextual questions check");
+
     // Handle contextual questions (can be at root or nested)
     final contextualQuestions = responseData['contextual_questions'] ??
         botResponse['contextual_questions'];
     if (contextualQuestions != null && contextualQuestions is List) {
       final List<String> questions = List<String>.from(contextualQuestions);
       setState(() {
-        _lastContextualQuestions = questions;
-      });
-    } else {
-      setState(() {
-        _lastContextualQuestions = [];
+        _lastContextualQuestions = questions.cast<String>();
       });
     }
   }
 
-  void _handleSpendingSummaryResponse(Map<String, dynamic> responseData) {
+// New method to handle spending summary responses
+  void _handleSpendingSummaryResponse(Map<dynamic, dynamic> responseData) {
     final structuredSummary = responseData['structured_summary'] as Map;
     final details = responseData['details'] as Map?;
 
+    // Extract data from structured_summary
     final summaryTitle =
         structuredSummary['summary_title']?.toString() ?? 'Spending Summary';
     final totalSpent =
@@ -850,15 +880,18 @@ class _AiBotScreenState extends State<AiBotScreen>
         structuredSummary['breakdown_merchants'] as List? ?? [];
     final trendInsights = structuredSummary['trend_insights'] as List? ?? [];
 
+    // Generate friendly message based on category
     final category = details?['category']?.toString() ?? '';
     String friendlyMessage = _generateFriendlyMessage(category, totalSpent);
 
     setState(() {
+      // Add friendly message first
       _messages.add(BotMessage(
         id: DateTime.now().toIso8601String(),
         text: friendlyMessage,
       ));
 
+      // Add spending summary widget
       _messages.add(BotMessage(
         id: "spend_summary_${DateTime.now().toIso8601String()}",
         text: "[SPEND_INSIGHTS_SUMMARY]",
@@ -870,13 +903,13 @@ class _AiBotScreenState extends State<AiBotScreen>
           "trend_insights": trendInsights,
         },
       ));
-      // ✅ Set loading to false
-      _isLoadingResponse = false;
     });
   }
 
+// Helper method to generate friendly messages based on category
   String _generateFriendlyMessage(String category, String totalSpent) {
     final categoryLower = category.toLowerCase();
+
     if (categoryLower.contains('coffee')) {
       return 'Looks like you needed your caffeine fix!\nYou spent a total of $totalSpent on coffee.';
     } else if (categoryLower.contains('food') ||
@@ -911,56 +944,5 @@ class _AiBotScreenState extends State<AiBotScreen>
     _inputController.dispose();
     _speech.stop();
     super.dispose();
-  }
-}
-
-// ✅ NEW: Streaming dots animation widget
-class _StreamingDots extends StatefulWidget {
-  @override
-  State<_StreamingDots> createState() => _StreamingDotsState();
-}
-
-class _StreamingDotsState extends State<_StreamingDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  int _dotCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )
-      ..addListener(() {
-        if (_controller.status == AnimationStatus.completed) {
-          _controller.reset();
-        }
-        setState(() {
-          _dotCount = (_controller.value * 3).floor() + 1;
-        });
-      })
-      ..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 30,
-      child: Text(
-        "." * _dotCount,
-        style: const TextStyle(
-          fontSize: 24,
-          color: Colors.blueAccent,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
   }
 }

@@ -11,7 +11,6 @@ Clean separation between:
 Entry point for building the complete agent graph.
 """
 
-import logging
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from ..core.state import AgentState, StateManager
@@ -21,35 +20,41 @@ from ..flows.transfer_flow import TransferFlowHandler
 from ..core.constants import TRANSFER_FLOW_PHASES
 from ..services.intent_classifier import IntentClassifier
 from ..nodes.main_nodes import (
-    spend_node, faq_node, offers_node, unknown_node, voice_node
+    spend_node,
+    faq_node,
+    offers_node,
+    unknown_node,
+    voice_node,
 )
 from ..nodes.confirmation_nodes import confirmation_node, interruption_confirmation_node
+from utils.logger import get_logger
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # ============================================================================
 # MAIN FLOW NODES
 # ============================================================================
+logger.info("Defining main flow nodes...")
+
 
 def classify_intent_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Intent classification with interruption detection.
-    
+
     Handles:
     - Standard intent classification
-    - Interruption detection in ALL transfer phases (NEW)
-    - Routing to appropriate nodes
+    - Interruption detection in ALL transfer phases
+    - Routing within transfer flow phases
     """
     StateManager.ensure_defaults(state)
     phase = StateManager.get_phase(state)
     user_input = state.get("user_input", "").lower().strip()
-    
-    # Check for interruptions in ANY transfer phase (NEW)
+
+    # Check for interruptions in ANY transfer phase
     if phase in TRANSFER_FLOW_PHASES:
         is_interruption, new_intent = _detect_interruption(phase, user_input)
-        
+
         if is_interruption:
             state["phase"] = ConversationPhase.INTERRUPTION_CONFIRMATION
             state["intent"] = IntentType.INTERRUPTION_CONFIRMATION
@@ -58,46 +63,54 @@ def classify_intent_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "pending_transfer": state.get("pending_transfer"),
                 "confirmation_context": state.get("confirmation_context"),
                 "otp_attempts": state.get("otp_attempts"),
-                "selection_attempts": state.get("selection_attempts"),  # NEW
+                "selection_attempts": state.get("selection_attempts"),
                 "new_intent": new_intent,
             }
             return state
-    
-    # Standard classification for NORMAL phase
+
+    # Route based on current phase
     if phase == ConversationPhase.NORMAL:
+        # Standard classification
         state["intent"] = IntentClassifier.classify(user_input)
-    elif phase == ConversationPhase.BENEFICIARY_SELECTION:  # NEW
-        state["intent"] = IntentType.TRANSFER
-    elif phase == ConversationPhase.ACCOUNT_SELECTION:  # NEW
-        state["intent"] = IntentType.TRANSFER
-    elif phase == ConversationPhase.TRANSFER_SUMMARY:  # NEW
-        state["intent"] = IntentType.TRANSFER
+        logger.info(f"Classified intent: {state['intent']}")
+    elif phase == ConversationPhase.BENEFICIARY_SELECTION:
+        # User is responding to beneficiary selection prompt
+        state["intent"] = IntentType.BENEFICIARY_SELECTION  # NEW intent type needed
+    elif phase == ConversationPhase.ACCOUNT_SELECTION:
+        # User is responding to account selection prompt
+        state["intent"] = IntentType.ACCOUNT_SELECTION  # NEW intent type needed
+    elif phase == ConversationPhase.TRANSFER_SUMMARY:
+        # User is confirming transfer summary
+        state["intent"] = IntentType.TRANSFER_SUMMARY  # NEW intent type needed
     elif phase == ConversationPhase.OTP:
         state["intent"] = IntentType.OTP
     elif phase == ConversationPhase.CONFIRMATION:
         state["intent"] = IntentType.CONFIRMATION
-    
-    return state
 
+    return state
 
 
 def transfer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Route to transfer sub-graph."""
+    logger.info("Routing to transfer flow handler...")
     return TransferFlowHandler.initiate_transfer(state)
 
 
 def beneficiary_selection_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Handle beneficiary selection phase."""
+    logger.info("Handling beneficiary selection node...")
     return TransferFlowHandler.handle_beneficiary_selection(state)
 
 
 def account_selection_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Handle account selection phase."""
+    logger.info("Handling account selection node...")
     return TransferFlowHandler.handle_account_selection(state)
 
 
 def transfer_summary_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Handle transfer summary confirmation phase."""
+    logger.info("Handling transfer summary confirmation node...")
     return TransferFlowHandler.handle_transfer_summary_confirmation(state)
 
 
@@ -110,19 +123,44 @@ def transfer_confirmation_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Handle recurring transfer confirmation."""
     return TransferFlowHandler.confirm_recurring_transfer(state)
 
+
 # ============================================================================
 # MAIN FLOW ROUTING
 # ============================================================================
 
+
 def route_from_classify_intent(state: Dict[str, Any]) -> str:
-    """Route based on classified intent."""
-    return state.get("intent", IntentType.UNKNOWN)
+    """Route based on classified intent (returns node names)."""
+    intent = state.get("intent", IntentType.UNKNOWN)
+
+    if intent == IntentType.SPEND:
+        return "spend"
+    if intent == IntentType.FAQ:
+        return "faq"
+    # if intent == IntentType.OFFERS:
+    #     return "offers"
+    if intent == IntentType.TRANSFER:
+        return "transfer"
+    if intent == IntentType.BENEFICIARY_SELECTION:
+        return "beneficiary_selection"
+    if intent == IntentType.ACCOUNT_SELECTION:
+        return "account_selection"
+    if intent == IntentType.TRANSFER_SUMMARY:
+        return "transfer_summary"
+    if intent == IntentType.OTP:
+        return "transfer_otp"
+    if intent == IntentType.CONFIRMATION:
+        return "confirmation"
+    if intent == IntentType.INTERRUPTION_CONFIRMATION:
+        return "interruption_confirmation"
+
+    return "unknown"
 
 
 def _detect_interruption(phase: ConversationPhase, user_input: str) -> tuple:
     """
     Detect if current input interrupts a sensitive phase.
-    
+
     Returns:
         (is_interruption: bool, new_intent: str)
     """
@@ -132,49 +170,52 @@ def _detect_interruption(phase: ConversationPhase, user_input: str) -> tuple:
             new_intent = IntentClassifier.classify(user_input)
             if new_intent != IntentType.UNKNOWN:
                 return True, new_intent
-    
+
     # CONFIRMATION phase: response other than yes/no that's a valid intent
     if phase == ConversationPhase.CONFIRMATION:
         if user_input not in ("yes", "no"):
             new_intent = IntentClassifier.classify(user_input)
             if new_intent != IntentType.UNKNOWN:
                 return True, new_intent
-    
+
     return False, IntentType.UNKNOWN
+
 
 def _route_from_transfer(state: Dict[str, Any]) -> str:
     """
     Route based on transfer phase.
-    
-    Determines which transfer phase node to invoke next.
-    """
-    result = state.get("result", {})
-    phase = StateManager.get_phase(state)
-    status = result.get("status", "")
-    
-    if status == "multiple_matches":
-        return "beneficiary_selection"
-    elif phase == ConversationPhase.BENEFICIARY_SELECTION:
-        return "account_selection"
-    elif phase == ConversationPhase.ACCOUNT_SELECTION:
-        return "transfer_summary"
-    elif phase == ConversationPhase.TRANSFER_SUMMARY:
-        if status == "otp_required":
-            return "transfer_otp"
-        return "end"
-    
-    return "end"
 
+    Key principle: If a phase was just SET (not processed), return END to wait for user input.
+    Only route to next node if we're CONTINUING from a previous phase.
+    """
+    phase = StateManager.get_phase(state)
+
+    # These phases mean "waiting for user input" - stop here
+    if phase in [
+        ConversationPhase.BENEFICIARY_SELECTION,
+        ConversationPhase.ACCOUNT_SELECTION,
+        ConversationPhase.TRANSFER_SUMMARY,
+        ConversationPhase.OTP,
+        ConversationPhase.CONFIRMATION,
+    ]:
+        logger.info(
+            f"Transfer flow set phase to {phase} - ending to wait for user input"
+        )
+        return "end"
+
+    # Phase is NORMAL or complete - flow is done
+    return "end"
 
 
 # ============================================================================
 # GRAPH BUILDER
 # ============================================================================
 
+
 def build_main_flow():
     """
     Build and compile the main LangGraph flow with enhanced transfer support.
-    
+
     Structure:
     1. classify_intent (entry point)
     2. Intent-specific nodes (spend, faq, offers, transfer)
@@ -183,81 +224,85 @@ def build_main_flow():
     5. Fallback (unknown, voice)
     """
     workflow = StateGraph(AgentState, config={"recursion_limit": 50})
-    
+
     # -----------------------------------------------------------------------
     # ADD NODES
     # -----------------------------------------------------------------------
-    
+
     # Intent classification
     workflow.add_node("classify_intent", classify_intent_node)
-    
+
     # Main flow nodes
     workflow.add_node("spend", spend_node)
     workflow.add_node("faq", faq_node)
     workflow.add_node("offers", offers_node)
     workflow.add_node("unknown", unknown_node)
     workflow.add_node("voice", voice_node)
-    
+
     # Transfer flow nodes (UPDATED with new phases)
     workflow.add_node("transfer", transfer_node)
     workflow.add_node("beneficiary_selection", beneficiary_selection_node)  # NEW
-    workflow.add_node("account_selection", account_selection_node)          # NEW
-    workflow.add_node("transfer_summary", transfer_summary_node)            # NEW
-    workflow.add_node("transfer_otp", transfer_otp_node)                    # NEW (renamed)
-    
+    workflow.add_node("account_selection", account_selection_node)  # NEW
+    workflow.add_node("transfer_summary", transfer_summary_node)  # NEW
+    workflow.add_node("transfer_otp", transfer_otp_node)  # NEW (renamed)
+
     # Confirmation nodes
     workflow.add_node("confirmation", transfer_confirmation_node)
     workflow.add_node("interruption_confirmation", interruption_confirmation_node)
-    
+
     # -----------------------------------------------------------------------
     # SET ENTRY POINT
     # -----------------------------------------------------------------------
     workflow.set_entry_point("classify_intent")
-    
+
     # -----------------------------------------------------------------------
     # ADD EDGES
     # -----------------------------------------------------------------------
-    
+
     # Main routing from classify_intent
     workflow.add_conditional_edges(
         "classify_intent",
         route_from_classify_intent,
-        {
-            IntentType.SPEND: "spend",
-            IntentType.FAQ: "faq",
-            IntentType.OFFERS: "offers",
-            IntentType.TRANSFER: "transfer",
-            IntentType.OTP: "transfer_otp",  # UPDATED (was "otp")
-            IntentType.CONFIRMATION: "confirmation",
-            IntentType.INTERRUPTION_CONFIRMATION: "interruption_confirmation",
-            IntentType.UNKNOWN: "unknown",
-        },
     )
-    
-    # Transfer flow conditional routing (NEW)
-    workflow.add_conditional_edges(
-        "transfer",
-        lambda state: _route_from_transfer(state),
-        {
-            "beneficiary_selection": "beneficiary_selection",
-            "account_selection": "account_selection",
-            "transfer_summary": "transfer_summary",
-            "transfer_otp": "transfer_otp",
-            "end": END,
-        }
-    )
-    
-    # Transfer phase terminal edges (NEW)
+
+    # # Transfer flow conditional routing (NEW)
+    # workflow.add_conditional_edges(
+    #     "transfer",
+    #     lambda state: _route_from_transfer(state),
+    #     {
+    #         "beneficiary_selection": "beneficiary_selection",
+    #         "account_selection": "account_selection",
+    #         "transfer_summary": "transfer_summary",
+    #         "transfer_otp": "transfer_otp",
+    #         "end": END,
+    #     }
+    # )
+
+    # # Transfer phase terminal edges (NEW)
+    # workflow.add_edge("beneficiary_selection", END)
+    # workflow.add_edge("account_selection", END)
+    # workflow.add_edge("transfer_summary", END)
+    # workflow.add_edge("transfer_otp", END)
+
+    # Transfer node always ends - let classify_intent route the next user input
+    workflow.add_edge("transfer", END)
     workflow.add_edge("beneficiary_selection", END)
     workflow.add_edge("account_selection", END)
     workflow.add_edge("transfer_summary", END)
     workflow.add_edge("transfer_otp", END)
-    
+
     # All other terminal nodes end the flow
-    for node in ["spend", "faq", "offers", "confirmation",
-                 "interruption_confirmation", "unknown", "voice"]:
+    for node in [
+        "spend",
+        "faq",
+        "offers",
+        "confirmation",
+        "interruption_confirmation",
+        "unknown",
+        "voice",
+    ]:
         workflow.add_edge(node, END)
-    
+
     # Compile and return
     return workflow.compile()
 
@@ -265,6 +310,7 @@ def build_main_flow():
 # ============================================================================
 # CLI RUNNER (for testing)
 # ============================================================================
+
 
 def run_cli():
     """Simple CLI for testing the flow."""
@@ -279,40 +325,40 @@ def run_cli():
         "confirmation_context": None,
         "user_id": "1",
     }
-    
+
     print("=== Virtual Financial Assistant ===")
     print("Type 'quit' or 'exit' to stop\n")
-    
+
     while True:
         try:
             user_input = input("You: ").strip()
-            
+
             if user_input.lower() in ["quit", "exit"]:
                 print("Goodbye!")
                 break
-            
+
             if not user_input:
                 continue
-            
+
             # Reset intent for new input
             state["user_input"] = user_input
             state["intent"] = IntentType.UNKNOWN
             StateManager.ensure_defaults(state)
-            
+
             # Invoke graph
             result = graph.invoke(state)
-            
+
             # Extract and display result
             bot_response = result.get("result", "No response")
             if isinstance(bot_response, dict):
                 bot_response = bot_response.get("message", str(bot_response))
-            
+
             print(f"Bot: {bot_response}\n")
-            
+
             # Update state for next iteration
             if isinstance(result, dict):
                 state.update(result)
-        
+
         except KeyboardInterrupt:
             print("\nInterrupted by user")
             break

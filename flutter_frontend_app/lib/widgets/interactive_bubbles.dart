@@ -132,7 +132,7 @@ class _BubbleButtonState extends State<_BubbleButton>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               colors: [
                 AppColors.bubbleGradientStart,
                 AppColors.bubbleGradientEnd,

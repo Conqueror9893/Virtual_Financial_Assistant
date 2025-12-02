@@ -1,0 +1,32 @@
+[
+  {
+    "user_id": 1,
+    "account_number": "458923947104",
+    "name": "Syed Tajamul Shah",
+    "account_type": "savings",
+    "ifsc": "HDFC0001398",
+    "bank_name": "HDFC Bank",
+    "branch": "MG Road",
+    "balance": 50000,
+    "currency": "USD",
+    "opened_date": "2022-11-19",
+    "contact_number": "+919823434567",
+    "email": "tajamulshah@email.com",
+    "status": "active"
+  },
+  {
+    "user_id": 1,
+    "account_number": "834275930121",
+    "name": "Syed Tajamul Shah",
+    "account_type": "current",
+    "ifsc": "ICIC0005631",
+    "bank_name": "ICICI Bank",
+    "branch": "Jayanagar",
+    "balance": 250000,
+    "currency": "USD",
+    "opened_date": "2021-11-19",
+    "contact_number": "+919823434567",
+    "email": "tajamulshah@email.com",
+    "status": "active"
+  }
+]
