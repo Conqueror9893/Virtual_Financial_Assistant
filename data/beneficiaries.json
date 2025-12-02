@@ -52,5 +52,11 @@
     "name": "Ms. Amy Jones",
     "account_number": "0912876987",
     "ifsc": "ICIC0003456"
+  },
+  {
+    "nickname": "landlord",
+    "name": "Mr. Home Owner",
+    "account_number": "1234567890",
+    "ifsc": "BANK000001"
   }
 ]

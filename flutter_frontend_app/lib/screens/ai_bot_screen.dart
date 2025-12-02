@@ -336,6 +336,7 @@ class _AiBotScreenState extends State<AiBotScreen>
                               onRecommendationResponse:
                                   _handleRecommendationResponse,
                               onOpenTransferForm: _handleOpenTransferForm,
+                              onInlineTransferSubmit: _handleInlineTransferSubmit,
                             );
                           }
 
@@ -434,6 +435,11 @@ class _AiBotScreenState extends State<AiBotScreen>
         },
       ),
     );
+  }
+
+  void _handleInlineTransferSubmit(double amount, String remarks) {
+    final message = "Transfer USD $amount with remarks: $remarks";
+    _sendMessage(message);
   }
 
   // Transfer flow handlers
@@ -801,6 +807,21 @@ class _AiBotScreenState extends State<AiBotScreen>
         _lastContextualQuestions = [];
       });
       return; // Important: exit early since transfer form handled
+    } else if (responseData.containsKey('action') &&
+        responseData['action'] == 'show_inline_transfer_form') {
+      final String message =
+          responseData['message'] ?? 'Please fill out the form below';
+      setState(() {
+        _messages.add(BotMessage(
+          id: DateTime.now().toIso8601String(),
+          text: message,
+          phase: 'ConversationPhase.NORMAL',
+          action: 'show_inline_transfer_form',
+        ));
+        _isLoadingResponse = false;
+        _lastContextualQuestions = [];
+      });
+      return;
     } else if (responseData.containsKey('message')) {
       final message = responseData['message']?.toString() ?? '';
       setState(() {

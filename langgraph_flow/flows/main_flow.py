@@ -121,7 +121,11 @@ def transfer_otp_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
 def transfer_confirmation_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Handle recurring transfer confirmation."""
-    return TransferFlowHandler.confirm_recurring_transfer(state)
+    action = state.get("confirmation_context", {}).get("action")
+    if action == "confirm_rent_payment":
+        return TransferFlowHandler.confirm_rent_payment(state)
+    else:
+        return TransferFlowHandler.confirm_recurring_transfer(state)
 
 
 # ============================================================================

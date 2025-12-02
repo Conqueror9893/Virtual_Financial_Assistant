@@ -9,6 +9,7 @@ import 'package:flutter_frontend_app/widgets/account_selection_card.dart';
 import 'package:flutter_frontend_app/widgets/transfer_summary_card.dart';
 import 'package:flutter_frontend_app/widgets/transaction_success_card.dart';
 import 'package:flutter_frontend_app/widgets/clickable_text_link.dart';
+import 'package:flutter_frontend_app/widgets/inline_transfer_form.dart';
 import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../utils/logger.dart';
@@ -23,6 +24,7 @@ class BotMessageBubble extends StatefulWidget {
   final void Function(String)? onOtpEntered;
   final void Function(bool, String?)? onRecommendationResponse;
   final void Function(String, String, double)? onOpenTransferForm;
+  final void Function(double, String)? onInlineTransferSubmit;
 
   const BotMessageBubble({
     super.key,
@@ -33,6 +35,7 @@ class BotMessageBubble extends StatefulWidget {
     this.onOtpEntered,
     this.onRecommendationResponse,
     this.onOpenTransferForm,
+    this.onInlineTransferSubmit,
   });
 
   @override
@@ -49,6 +52,8 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
     // ✅ CHECK FOR TRANSFER FORM LINK FIRST (highest priority)
     if (message.action == 'show_transfer_form') {
       return _buildTransferFormLink();
+    } else if (message.action == 'show_inline_transfer_form') {
+      return _buildInlineTransferForm();
     }
 
     // Handle transfer flow phases
@@ -152,6 +157,33 @@ class _BotMessageBubbleState extends State<BotMessageBubble> {
             }
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildInlineTransferForm() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.message.text != null)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Text(
+                  widget.message.text!,
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ),
+            ),
+          InlineTransferForm(
+            onSubmit: (amount, remarks) {
+              widget.onInlineTransferSubmit?.call(amount, remarks);
+            },
+          ),
+        ],
       ),
     );
   }

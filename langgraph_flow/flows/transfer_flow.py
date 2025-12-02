@@ -515,10 +515,9 @@ class TransferFlowHandler:
                 int(user_id), to_beneficiary, amount
             )
 
-            # Build recommendation
+            # Build recommendation for rent payment
             recommendation = (
-                f"You sent USD{amount} to {to_beneficiary.get('name')} today. "
-                f"Would you like to make this a recurring monthly transfer?"
+                "You usually pay your rent this time of the month, would you like to do the same today?"
             )
 
             state["result"] = {
@@ -530,20 +529,20 @@ class TransferFlowHandler:
                 "ifsc": to_beneficiary.get("ifsc"),
                 "timestamp": transfer_result.get("timestamp"),
                 "recommendation": recommendation,
-                "recommendation_id": f"rec-{user_id}-{to_beneficiary.get('id', 'unknown')}",
+                "recommendation_id": f"rent-{user_id}",
             }
 
-            # Move to confirmation phase for recurring recommendation
+            # Move to confirmation phase for rent recommendation
             state["phase"] = ConversationPhase.CONFIRMATION
             state["intent"] = IntentType.CONFIRMATION
             state["confirmation_context"] = {
-                "action": "confirm_recurring_transfer",
+                "action": "confirm_rent_payment",
                 "details": state["result"],
             }
             state["otp_attempts"] = 0
             state["pending_transfer"] = None
 
-            logger.info("OTP validated, transfer successful, moving to CONFIRMATION")
+            logger.info("OTP validated, transfer successful, moving to CONFIRMATION for rent payment")
             return state
 
         except Exception as e:
@@ -560,6 +559,74 @@ class TransferFlowHandler:
     # ========================================================================
     # CONFIRMATION PHASE (Recurring Transfer)
     # ========================================================================
+
+    @staticmethod
+    def confirm_rent_payment(state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle recommendation confirmation (yes/no for rent payment).
+        """
+        StateManager.ensure_defaults(state)
+        user_id = state.get("user_id", "1")
+
+        if StateManager.get_phase(state) != ConversationPhase.CONFIRMATION:
+            state["result"] = "No pending confirmation."
+            return state
+
+        user_input = IntentRouter.normalize_confirmation_input(state.get("user_input"))
+        state["user_input"] = user_input
+
+        if user_input == "yes":
+            # Initiate transfer to landlord
+            landlord_beneficiary = transfer_tool.resolve_beneficiary("landlord")
+            if landlord_beneficiary:
+                transfer_result = transfer_tool.perform_transfer(
+                    int(user_id), landlord_beneficiary, 300
+                )
+
+                # Build recommendation for recurring transfer
+                recommendation = (
+                    f"You sent USD300 to {landlord_beneficiary.get('name')} today. "
+                    f"Would you like to make this a recurring monthly transfer?"
+                )
+
+                state["result"] = {
+                    STATUS_SUCCESS: True,
+                    "message": f"Transfer of USD300 to {landlord_beneficiary.get('name')} successful!",
+                    "amount": 300,
+                    "beneficiary": landlord_beneficiary.get('name'),
+                    "account": landlord_beneficiary.get("account_number"),
+                    "ifsc": landlord_beneficiary.get("ifsc"),
+                    "timestamp": transfer_result.get("timestamp"),
+                    "recommendation": recommendation,
+                    "recommendation_id": f"rec-{user_id}-{landlord_beneficiary.get('id', 'unknown')}",
+                }
+
+                # Move to confirmation phase for recurring recommendation
+                state["phase"] = ConversationPhase.CONFIRMATION
+                state["intent"] = IntentType.CONFIRMATION
+                state["confirmation_context"] = {
+                    "action": "confirm_recurring_transfer",
+                    "details": state["result"],
+                }
+                return state
+            else:
+                state["result"] = {
+                    STATUS_ERROR: True,
+                    "message": "Could not find the landlord beneficiary.",
+                }
+        else:
+            state["result"] = {
+                STATUS_SUCCESS: True,
+                "message": "Rent payment skipped. Transfer completed successfully!",
+                "action": "close_transfer_form",
+            }
+
+        state["phase"] = ConversationPhase.NORMAL
+        state["confirmation_context"] = None
+        state["intent"] = IntentType.UNKNOWN
+
+        logger.info("Rent payment decision made, returning to NORMAL")
+        return state
 
     @staticmethod
     def confirm_recurring_transfer(state: Dict[str, Any]) -> Dict[str, Any]:
