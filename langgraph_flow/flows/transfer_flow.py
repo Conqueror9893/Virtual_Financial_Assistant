@@ -129,7 +129,7 @@ class TransferFlowHandler:
                 state["selection_attempts"] = 0
                 state["result"] = {
                     STATUS_SUCCESS: True,
-                    "message": f"Sending Rs {amount} to {beneficiary_result.get('name')}. Which account do you want to send from? \nI have found two linked accounts:",
+                    "message": f"Sending USD {amount} to {beneficiary_result.get('name')}. Which account do you want to send from? \nI have found two linked accounts:",
                     "options": account_options,
                 }
                 logger.info(state)
@@ -434,7 +434,7 @@ class TransferFlowHandler:
             state["otp_attempts"] = 0
             state["result"] = {
                 STATUS_OTP_REQUIRED: True,
-                "message": f"OTP sent to your registered mobile. Please enter OTP to confirm transfer of Rs {state['pending_transfer'].get('amount')}",
+                "message": f"OTP sent to your registered mobile. Please enter OTP to confirm transfer of USD {state['pending_transfer'].get('amount')}",
             }
             logger.info("Transfer confirmed, OTP sent, moving to OTP phase")
             return state
@@ -516,9 +516,7 @@ class TransferFlowHandler:
             )
 
             # Build recommendation for rent payment
-            recommendation = (
-                "You usually pay your rent this time of the month, would you like to do the same today?"
-            )
+            recommendation = "You usually pay your rent this time of the month, would you like to do the same today?"
 
             state["result"] = {
                 STATUS_SUCCESS: True,
@@ -542,7 +540,9 @@ class TransferFlowHandler:
             state["otp_attempts"] = 0
             state["pending_transfer"] = None
 
-            logger.info("OTP validated, transfer successful, moving to CONFIRMATION for rent payment")
+            logger.info(
+                "OTP validated, transfer successful, moving to CONFIRMATION for rent payment"
+            )
             return state
 
         except Exception as e:
@@ -585,15 +585,15 @@ class TransferFlowHandler:
 
                 # Build recommendation for recurring transfer
                 recommendation = (
-                    f"You sent USD300 to {landlord_beneficiary.get('name')} today. "
+                    f"You sent USD 300 to {landlord_beneficiary.get('name')} today. "
                     f"Would you like to make this a recurring monthly transfer?"
                 )
 
                 state["result"] = {
                     STATUS_SUCCESS: True,
-                    "message": f"Transfer of USD300 to {landlord_beneficiary.get('name')} successful!",
+                    "message": f"Transfer of USD 300 to {landlord_beneficiary.get('name')} successful!",
                     "amount": 300,
-                    "beneficiary": landlord_beneficiary.get('name'),
+                    "beneficiary": landlord_beneficiary.get("name"),
                     "account": landlord_beneficiary.get("account_number"),
                     "ifsc": landlord_beneficiary.get("ifsc"),
                     "timestamp": transfer_result.get("timestamp"),

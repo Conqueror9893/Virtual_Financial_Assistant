@@ -221,18 +221,19 @@ def build_main_flow():
     Build and compile the main LangGraph flow with enhanced transfer support.
 
     Structure:
-    1. classify_intent (entry point)
-    2. Intent-specific nodes (spend, faq, offers, transfer)
-    3. Transfer sub-graph nodes (beneficiary, account, summary, otp)
-    4. Confirmation nodes (confirmation, interruption_confirmation)
-    5. Fallback (unknown, voice)
+    1. language_translation_node (entry point)
+    2. classify_intent
+    3. Intent-specific nodes (spend, faq, offers, transfer)
+    4. Transfer sub-graph nodes (beneficiary, account, summary, otp)
+    5. Confirmation nodes (confirmation, interruption_confirmation)
+    6. Fallback (unknown, voice)
     """
     workflow = StateGraph(AgentState, config={"recursion_limit": 50})
 
     # -----------------------------------------------------------------------
     # ADD NODES
     # -----------------------------------------------------------------------
-
+    workflow.add_node("language_translation", language_translation_node)
     # Intent classification
     workflow.add_node("classify_intent", classify_intent_node)
 

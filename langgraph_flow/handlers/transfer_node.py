@@ -203,7 +203,7 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
             otp_code = transfer_tool.generate_otp(user_id)
             return {
                 "status": "otp_required",
-                "message": f"OTP sent to registered mobile for transfer of USD{amount} from {from_account} to {beneficiary_result['name']}.",
+                "message": f"OTP sent to registered mobile for transfer of USD {amount} from {from_account} to {beneficiary_result['name']}.",
                 "transfer_details": {
                     "amount": amount,
                     "to_beneficiary": beneficiary_result,
@@ -237,14 +237,14 @@ def handle_transfer(user_id: int, query_or_details, otp: str = None) -> dict:
         result = transfer_tool.perform_transfer(user_id, to_beneficiary, amount)
 
         recommendation = (
-            f"You sent Rs {amount} to {to_beneficiary.get('name')} today. "
+            f"You sent USD {amount} to {to_beneficiary.get('name')} today. "
             f"Would you like to make this a monthly transfer?"
         )
 
         # Flattened, single-level response JSON
         transfer_response = {
             "status": "success",
-            "message": f"Transfer of Rs {amount} to {to_beneficiary.get('name')} successful.",
+            "message": f"Transfer of USD {amount} to {to_beneficiary.get('name')} successful.",
             "amount": amount,
             "beneficiary": to_beneficiary.get("name"),
             "account": to_beneficiary.get("account_number"),

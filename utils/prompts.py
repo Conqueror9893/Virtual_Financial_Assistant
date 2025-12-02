@@ -13,7 +13,7 @@ Return ONLY a valid JSON object (no text before or after) with exactly these key
 - frequency: "one-time", "recurring", or null
 
 Rules:
-1. Amount can appear as INR100, Rs 100, $100, 100 or even just a number - extract numeric value only.
+1. Amount can appear as INR100, USD 100, $100, 100 or even just a number - extract numeric value only.
 2. to_beneficiary is the recipient name/nickname (e.g., "mom", "john").
 3. from_account: 
    - If the text mentions "savings", return "Savings".
