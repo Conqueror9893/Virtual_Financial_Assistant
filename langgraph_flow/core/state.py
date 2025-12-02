@@ -9,6 +9,9 @@ class AgentState(TypedDict, total=False):
     
     # Core conversation data
     user_input: str
+    user_input_en: str  # English version for processing
+    input_language: str  # Detected language code
+    original_user_input: str
     result: Any
     phase: ConversationPhase
     user_id: str
