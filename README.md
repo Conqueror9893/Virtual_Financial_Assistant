@@ -1,4 +1,4 @@
-# Appzia_Virtual_Financial_Assistant
+# Virtual_Financial_Assistant
 
 To start running the backend in VM:
 
