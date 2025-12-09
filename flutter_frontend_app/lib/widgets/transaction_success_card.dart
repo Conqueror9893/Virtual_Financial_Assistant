@@ -35,7 +35,7 @@ class TransactionSuccessCard extends StatelessWidget {
   void _copyTransactionDetails(BuildContext context) {
     final details = '''
 Transaction Successful
-Amount: USD${amount.toStringAsFixed(0)}
+Amount: USD ${amount.toStringAsFixed(0)}
 To: $beneficiary
 Date: ${_formatTimestamp(timestamp)}
     '''

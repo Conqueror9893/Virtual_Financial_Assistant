@@ -161,7 +161,7 @@ class TransferFlowHandler:
                 state["result"] = {
                     STATUS_SUCCESS: True,
                     "message": f"Transfer Summary:\n"
-                    f"Amount: USD{amount}\n"
+                    f"Amount: USD {amount}\n"
                     f"From: {from_account} Account\n"
                     f"To: {beneficiary_result.get('name')}\n"
                     f"Account: {beneficiary_result.get('account_number')}\n"
@@ -284,7 +284,7 @@ class TransferFlowHandler:
             state["result"] = {
                 STATUS_SUCCESS: True,
                 "message": f"Transfer Summary:\n"
-                f"Amount: USD{summary['amount']}\n"
+                f"Amount: USD {summary['amount']}\n"
                 f"From: {from_account} Account\n"
                 f"To: {selected.get('name')}\n"
                 f"Account: {selected.get('account_number')}\n"
@@ -361,7 +361,7 @@ class TransferFlowHandler:
         state["result"] = {
             STATUS_SUCCESS: True,
             "message": f"Transfer Summary:\n"
-            f"Amount: USD{amount}\n"
+            f"Amount: USD {amount}\n"
             f"From: {user_account.capitalize()} Account\n"
             f"To: {to_beneficiary.get('name')}\n"
             f"Account: {to_beneficiary.get('account_number')}\n"
@@ -431,9 +431,14 @@ class TransferFlowHandler:
 
             # FIXED: Check if rent transfer vs normal transfer
             result = state.get("result", {})
+            logger.info(f"Current result before OTP phase: {result}")
             if result.get("is_rent_transfer"):
                 # Rent transfer - fixed amount 300
                 message = "OTP sent to your registered mobile. Please enter OTP to confirm rent payment of USD 300"
+                is_rent_transfer = result.get("is_rent_transfer", False)
+                state["pending_transfer"]["is_rent_transfer"] = is_rent_transfer
+                logger.info("Rent transfer confirmed, OTP sent for rent payment")
+                logger.info(state)
             else:
                 # Normal transfer - use pending_transfer amount
                 amount = state["pending_transfer"].get("amount", 0)
@@ -528,7 +533,9 @@ class TransferFlowHandler:
 
             # Build recommendation - check if THIS was a rent payment
             # (transferred from rent recommendation in confirm_rent_payment)
-            is_rent_transfer = state.get("result", {}).get("is_rent_transfer", False)
+            is_rent_transfer = state.get("pending_transfer", {}).get("is_rent_transfer", False)
+            logger.info(state)
+            logger.info(f"Is rent transfer: {is_rent_transfer}")
 
             if is_rent_transfer:
                 # This WAS a rent transfer - show recurring recommendation
@@ -569,7 +576,6 @@ class TransferFlowHandler:
 
             logger.info("OTP validated, transfer successful, moving to CONFIRMATION")
             return state
-
 
         except Exception as e:
             logger.exception("OTP validation failed")

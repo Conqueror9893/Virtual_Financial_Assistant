@@ -46,7 +46,7 @@ class TransferSummaryCard extends StatelessWidget {
             _buildSummaryRow(
               icon: Icons.currency_rupee,
               label: 'Amount',
-              value: 'USD${amount.toStringAsFixed(0)}',
+              value: 'USD ${amount.toStringAsFixed(0)}',
               iconColor: AppColors.successColor,
             ),
 

@@ -310,7 +310,6 @@ def _build_structured_spend_summary(
         trend_insights.append(
             f"Other top merchants: {', '.join([m['genify_clean_description'] for m in merchants[1:]])}."
         )
-    trend_insights.append("Would you like the full breakdown?")
 
     return {
         "summary_title": title,
@@ -416,7 +415,6 @@ We have this spend analysis result (JSON keys: {', '.join(result.keys())}).
 Provide a short chat-friendly reply (maximum 2-3 sentences, one paragraph) that:
   - States the total spend (if available).
   - Lists the top 2-3 categories or top 3 merchants if the query is for a category.
-  - Ends with a short CTA like "Would you like the full breakdown?" or "Want more detail?"
 
 Return ONLY the short reply (plain text). Do not return JSON or internal debug info.
 The currency is USD and return the amount ONLY in USD. 
@@ -464,6 +462,5 @@ Here is the analysis JSON:
         else:
             parts.append(f"Top categories: {top_text}.")
 
-    parts.append("Would you like the full breakdown?")
 
     return " ".join(parts)

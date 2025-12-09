@@ -57,6 +57,12 @@ class _AiBotScreenState extends State<AiBotScreen>
   String? _pendingRecommendationId;
   String? _pendingBeneficiaryId;
 
+  // ✅ NEW: Inline transfer form state
+  bool _showTransferForm = false;
+  String _currentBeneficiaryName = '';
+  String _currentBeneficiaryId = '';
+  double _currentTransferAmount = 0.0;
+
   // Loading state
   bool _isLoadingResponse = false;
 
@@ -336,7 +342,8 @@ class _AiBotScreenState extends State<AiBotScreen>
                               onRecommendationResponse:
                                   _handleRecommendationResponse,
                               onOpenTransferForm: _handleOpenTransferForm,
-                              onInlineTransferSubmit: _handleInlineTransferSubmit,
+                              onInlineTransferSubmit:
+                                  _handleInlineTransferSubmit,
                             );
                           }
 
@@ -344,6 +351,15 @@ class _AiBotScreenState extends State<AiBotScreen>
                         },
                       ),
                     ),
+                    // ✅ NEW: Inline Transfer Form (displays here instead of modal)
+                    if (_showTransferForm)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 12.0,
+                        ),
+                        child: _buildInlineTransferForm(),
+                      ),
                     // ✅ Show suggestions ONLY when not loading and not in transfer flow
                     if (!_isLoadingResponse &&
                         !_isInTransferFlow &&
@@ -373,6 +389,199 @@ class _AiBotScreenState extends State<AiBotScreen>
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ NEW: Build inline transfer form widget
+  Widget _buildInlineTransferForm() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Setup Recurring Transfer',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showTransferForm = false;
+                    });
+                  },
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Divider(color: Colors.grey.withOpacity(0.3)),
+            const SizedBox(height: 12),
+
+            // Beneficiary info
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    color: AppColors.bubbleGradientEnd,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Beneficiary',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Mr. Duanmu Huai',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Quick form preview
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.2),
+                ),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Amount: USD 300',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Frequency: Monthly',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Installments: 12',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text( 'Start Date: 03-Dec-2025', style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),),
+                  SizedBox(height: 8),
+                  Text(
+                    'Fill in the details below to set up recurring transfer',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showTransferForm = false;
+                      });
+                    },
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Colors.grey),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      _openFullTransferForm;
+                      
+                       ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Recurring transfer of USD 300 set up successfully!'),
+                    ),
+                  );
+                  setState(() {
+                        _showTransferForm = false;
+                      });
+                    },
+                    icon: const Icon(Icons.edit_note_rounded, size: 16),
+                    label: const Text('Submit Form'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.bubbleGradientEnd,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -464,8 +673,24 @@ class _AiBotScreenState extends State<AiBotScreen>
     }
   }
 
+  // ✅ NEW: Handle inline transfer form open
   void _handleOpenTransferForm(
       String beneficiaryName, String beneficiaryId, double amount) {
+    setState(() {
+      _showTransferForm = true;
+      _currentBeneficiaryName = beneficiaryName;
+      _currentBeneficiaryId = beneficiaryId;
+      _currentTransferAmount = amount;
+    });
+    // Scroll down to show the form
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _scrollToBottom();
+    });
+  }
+
+// ✅ NEW: Open full transfer form (you can keep modal or make full-screen)
+  void _openFullTransferForm() {
+    // Option 1: Open as modal (keeping existing behavior)
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -480,8 +705,8 @@ class _AiBotScreenState extends State<AiBotScreen>
               borderRadius: BorderRadius.circular(16),
               clipBehavior: Clip.antiAlias,
               child: TransferForm(
-                beneficiaryName: beneficiaryName,
-                initialAmount: amount,
+                beneficiaryName: _currentBeneficiaryName,
+                initialAmount: _currentTransferAmount,
                 onSubmit:
                     (amount, frequency, installments, remarks, startDate) {
                   logger.info(
@@ -715,14 +940,14 @@ class _AiBotScreenState extends State<AiBotScreen>
       final answer = botResponse['answer'] ?? '';
       final sources = (botResponse['sources'] as List?) ?? [];
       String displayText = answer;
-      if (sources.isNotEmpty) {
-        displayText += '\n\n';
-        for (var src in sources) {
-          final file = src['file'] ?? '';
-          final link = src['link'] ?? '';
-          displayText += '[$file]($link)\n\n';
-        }
-      }
+      // if (sources.isNotEmpty) {
+      //   displayText += '\n\n';
+      //   for (var src in sources) {
+      //     final file = src['file'] ?? '';
+      //     final link = src['link'] ?? '';
+      //     displayText += '[$file]($link)\n\n';
+      //   }
+      // }
       setState(() {
         _messages.add(BotMessage(
           id: DateTime.now().toIso8601String(),

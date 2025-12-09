@@ -10,7 +10,6 @@ import 'package:flutter_frontend_app/widgets/transfer_summary_card.dart';
 import 'package:flutter_frontend_app/widgets/transaction_success_card.dart';
 import 'package:flutter_frontend_app/widgets/clickable_text_link.dart';
 import 'package:flutter_frontend_app/widgets/inline_transfer_form.dart';
-import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../utils/logger.dart';
 

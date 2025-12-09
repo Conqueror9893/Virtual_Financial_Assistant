@@ -4,17 +4,17 @@ def format_spend_response(insight: dict) -> dict:
     result = insight.get("result", {})
 
     if "total_spend_category" in result:
-        text = f"You spent USD{result['total_spend_category']:.2f} on {details['category']}."
+        text = f"You spent ${result['total_spend_category']:.2f} on {details['category']}."
         if result.get("top_merchants"):
-            merchants = ", ".join([f"{m['genify_clean_description']} (USD{m['TXN_AMOUNT_LCY']:.2f})"
+            merchants = ", ".join([f"{m['genify_clean_description']} (${m['TXN_AMOUNT_LCY']:.2f})"
                                    for m in result["top_merchants"]])
             text += f" Top merchants: {merchants}"
     elif "total_spend_merchant" in result:
-        text = f"You spent USD{result['total_spend_merchant']:.2f} at {details['merchant']}."
+        text = f"You spent ${result['total_spend_merchant']:.2f} at {details['merchant']}."
     else:
-        text = f"Your total spend was USD{result['total_spend']:.2f}."
+        text = f"Your total spend was ${result['total_spend']:.2f}."
         if result.get("breakdown"):
-            breakdown = ", ".join([f"{b['genify_category']}: USD{b['TXN_AMOUNT_LCY']:.2f}"
+            breakdown = ", ".join([f"{b['genify_category']}: ${b['TXN_AMOUNT_LCY']:.2f}"
                                    for b in result["breakdown"]])
             text += f" Breakdown: {breakdown}"
 

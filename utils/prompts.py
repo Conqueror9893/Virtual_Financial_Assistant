@@ -13,7 +13,7 @@ Return ONLY a valid JSON object (no text before or after) with exactly these key
 - frequency: "one-time", "recurring", or null
 
 Rules:
-1. Amount can appear as INR100, USD 100, $100, 100 or even just a number - extract numeric value only.
+1. Amount can appear as USD100, USD 100, $100, 100 or even just a number - extract numeric value only.
 2. to_beneficiary is the recipient name/nickname (e.g., "mom", "john").
 3. from_account: 
    - If the text mentions "savings", return "Savings".
@@ -48,8 +48,8 @@ Return ONLY the single-word category label from: spend, faq, offers, transfer, u
 """
 
 FAQ_ANSWERING_PROMPT = """
-    You are a helpful and concise banking FAQ assistant for the bank "XAC Bank".
-    Customer Support number is 1800-1888.
+    You are a helpful and concise banking FAQ assistant for the bank "Bank Rakyat".
+    Customer Support number is 1-300-80-5454.
     The user asked: "{query}".
     Based strictly on the information provided below, give a clear and direct answer.
     Do NOT mention documents, sources, file names, or any references. Do NOT provide document names or links.
