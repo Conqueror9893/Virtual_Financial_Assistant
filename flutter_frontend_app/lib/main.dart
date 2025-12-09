@@ -14,6 +14,7 @@ void main() async {
   final displayData = AiDisplayData.fromJson(configJson);
 
   runApp(MaterialApp(
+    debugShowCheckedModeBanner: false, 
     home: ChatbotLauncher(displayData: displayData),
     theme: ThemeData(
       fontFamily: 'Outfit',

@@ -129,7 +129,7 @@ class TransferFlowHandler:
                 state["selection_attempts"] = 0
                 state["result"] = {
                     STATUS_SUCCESS: True,
-                    "message": f"Sending Rs {amount} to {beneficiary_result.get('name')}. Which account do you want to send from? \nI have found two linked accounts:",
+                    "message": f"Sending USD {amount} to {beneficiary_result.get('name')}. Which account do you want to send from? \nI have found two linked accounts:",
                     "options": account_options,
                 }
                 logger.info(state)
@@ -161,7 +161,7 @@ class TransferFlowHandler:
                 state["result"] = {
                     STATUS_SUCCESS: True,
                     "message": f"Transfer Summary:\n"
-                    f"Amount: USD{amount}\n"
+                    f"Amount: USD {amount}\n"
                     f"From: {from_account} Account\n"
                     f"To: {beneficiary_result.get('name')}\n"
                     f"Account: {beneficiary_result.get('account_number')}\n"
@@ -284,7 +284,7 @@ class TransferFlowHandler:
             state["result"] = {
                 STATUS_SUCCESS: True,
                 "message": f"Transfer Summary:\n"
-                f"Amount: USD{summary['amount']}\n"
+                f"Amount: USD {summary['amount']}\n"
                 f"From: {from_account} Account\n"
                 f"To: {selected.get('name')}\n"
                 f"Account: {selected.get('account_number')}\n"
@@ -361,7 +361,7 @@ class TransferFlowHandler:
         state["result"] = {
             STATUS_SUCCESS: True,
             "message": f"Transfer Summary:\n"
-            f"Amount: USD{amount}\n"
+            f"Amount: USD {amount}\n"
             f"From: {user_account.capitalize()} Account\n"
             f"To: {to_beneficiary.get('name')}\n"
             f"Account: {to_beneficiary.get('account_number')}\n"
@@ -429,13 +429,29 @@ class TransferFlowHandler:
         try:
             otp_code = transfer_tool.generate_otp(int(user_id))
 
+            # FIXED: Check if rent transfer vs normal transfer
+            result = state.get("result", {})
+            logger.info(f"Current result before OTP phase: {result}")
+            if result.get("is_rent_transfer"):
+                # Rent transfer - fixed amount 300
+                message = "OTP sent to your registered mobile. Please enter OTP to confirm rent payment of USD 300"
+                is_rent_transfer = result.get("is_rent_transfer", False)
+                state["pending_transfer"]["is_rent_transfer"] = is_rent_transfer
+                logger.info("Rent transfer confirmed, OTP sent for rent payment")
+                logger.info(state)
+            else:
+                # Normal transfer - use pending_transfer amount
+                amount = state["pending_transfer"].get("amount", 0)
+                message = f"OTP sent to your registered mobile. Please enter OTP to confirm transfer of USD {amount}"
+
             state["phase"] = ConversationPhase.OTP
             state["intent"] = IntentType.OTP
             state["otp_attempts"] = 0
             state["result"] = {
                 STATUS_OTP_REQUIRED: True,
-                "message": f"OTP sent to your registered mobile. Please enter OTP to confirm transfer of Rs {state['pending_transfer'].get('amount')}",
+                "message": message,
             }
+
             logger.info("Transfer confirmed, OTP sent, moving to OTP phase")
             return state
         except Exception as e:
@@ -515,11 +531,27 @@ class TransferFlowHandler:
                 int(user_id), to_beneficiary, amount
             )
 
-            # Build recommendation
-            recommendation = (
-                f"You sent USD{amount} to {to_beneficiary.get('name')} today. "
-                f"Would you like to make this a recurring monthly transfer?"
-            )
+            # Build recommendation - check if THIS was a rent payment
+            # (transferred from rent recommendation in confirm_rent_payment)
+            is_rent_transfer = state.get("pending_transfer", {}).get("is_rent_transfer", False)
+            logger.info(state)
+            logger.info(f"Is rent transfer: {is_rent_transfer}")
+
+            if is_rent_transfer:
+                # This WAS a rent transfer - show recurring recommendation
+                recommendation = (
+                    f"You sent USD {amount} to {to_beneficiary.get('name')} today. "
+                    f"Would you like to make this a recurring monthly transfer?"
+                )
+                recommendation_id = (
+                    f"recurring-{user_id}-{to_beneficiary.get('account_number')}"
+                )
+                confirmation_action = "confirm_recurring_transfer"
+            else:
+                # This was a normal transfer - show rent recommendation
+                recommendation = "You usually pay your rent this time of the month, would you like to do the same today?"
+                recommendation_id = f"rent-{user_id}"
+                confirmation_action = "confirm_rent_payment"
 
             state["result"] = {
                 STATUS_SUCCESS: True,
@@ -530,18 +562,17 @@ class TransferFlowHandler:
                 "ifsc": to_beneficiary.get("ifsc"),
                 "timestamp": transfer_result.get("timestamp"),
                 "recommendation": recommendation,
-                "recommendation_id": f"rec-{user_id}-{to_beneficiary.get('id', 'unknown')}",
+                "recommendation_id": recommendation_id,
             }
 
-            # Move to confirmation phase for recurring recommendation
-            state["phase"] = ConversationPhase.CONFIRMATION
-            state["intent"] = IntentType.CONFIRMATION
             state["confirmation_context"] = {
-                "action": "confirm_recurring_transfer",
+                "action": confirmation_action,
                 "details": state["result"],
             }
+
             state["otp_attempts"] = 0
-            state["pending_transfer"] = None
+            state["phase"] = ConversationPhase.CONFIRMATION
+            state["intent"] = IntentType.CONFIRMATION
 
             logger.info("OTP validated, transfer successful, moving to CONFIRMATION")
             return state
@@ -560,6 +591,87 @@ class TransferFlowHandler:
     # ========================================================================
     # CONFIRMATION PHASE (Recurring Transfer)
     # ========================================================================
+
+    @staticmethod
+    def confirm_rent_payment(state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle recommendation confirmation (yes/no for rent payment)."""
+        StateManager.ensure_defaults(state)
+        user_id = state.get("user_id", "1")
+
+        if StateManager.get_phase(state) != ConversationPhase.CONFIRMATION:
+            state["result"] = "No pending confirmation."
+            return state
+
+        user_input = IntentRouter.normalize_confirmation_input(state.get("user_input"))
+        state["user_input"] = user_input
+
+        if user_input == "yes":
+            # Resolve landlord beneficiary
+            landlord_beneficiary = transfer_tool.resolve_beneficiary("landlord")
+            if landlord_beneficiary:
+                # Pre-fill rent transfer details
+                landlord_name = landlord_beneficiary.get("name", "Landlord")
+                landlord_account = landlord_beneficiary.get("account_number")
+                landlord_ifsc = landlord_beneficiary.get("ifsc")
+                state["confirmation_context"] = None
+
+                summary = {
+                    "amount": 300,
+                    "from_account": "Savings",  # Pre-selected
+                    "to_beneficiary": landlord_name,
+                    "to_account": landlord_account,
+                    "to_ifsc": landlord_ifsc,
+                }
+
+                # CRITICAL: Set proper transfer state
+                state["phase"] = ConversationPhase.TRANSFER_SUMMARY
+                state["intent"] = IntentType.TRANSFER_SUMMARY
+                state["pending_transfer"] = {
+                    "amount": 300,
+                    "to_beneficiary": landlord_beneficiary,
+                    "from_account": "Savings",
+                    "frequency": "one-time",
+                    "summary": summary,
+                }
+
+                # UPDATE result - PRESERVE previous data
+                state["result"] = {
+                    **state.get("result", {}),  # Preserve existing success details
+                    "message": (
+                        f"Transfer Summary:\n"
+                        f"Amount: USD 300\n"
+                        f"From: Savings Account\n"
+                        f"To: {landlord_name}\n"
+                        f"Account: {landlord_account}\n\n"
+                        f"Confirm? (yes/no)"
+                    ),
+                    "summary": summary,
+                    "is_rent_transfer": True,
+                }
+
+                logger.info(
+                    "Rent payment confirmed, showing transfer summary with pending_transfer preserved"
+                )
+                logger.info(state)
+                return state
+            else:
+                state["result"] = {
+                    STATUS_ERROR: True,
+                    "message": "Could not find the landlord beneficiary.",
+                }
+        else:
+            # User said no to rent payment
+            state["result"] = {
+                STATUS_SUCCESS: True,
+                "message": "Rent payment skipped. Transfer completed successfully!",
+                "action": "close_transfer_form",
+            }
+            state["phase"] = ConversationPhase.NORMAL
+            state["confirmation_context"] = None
+            state["intent"] = IntentType.UNKNOWN
+            logger.info("Rent payment skipped, returning to NORMAL")
+
+        return state
 
     @staticmethod
     def confirm_recurring_transfer(state: Dict[str, Any]) -> Dict[str, Any]:

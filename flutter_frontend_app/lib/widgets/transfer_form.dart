@@ -434,7 +434,7 @@ class _TransferFormState extends State<TransferForm> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'USD${_amount.toStringAsFixed(0)} will be transferred $_frequency to ${widget.beneficiaryName} for $_installments installments, starting from ${DateFormat('MMM dd, yyyy').format(_selectedDate)}.',
+                            'USD ${_amount.toStringAsFixed(0)} will be transferred $_frequency to ${widget.beneficiaryName} for $_installments installments, starting from ${DateFormat('MMM dd, yyyy').format(_selectedDate)}.',
                             style: const TextStyle(
                               fontSize: 13,
                               color: AppColors.textPrimary,
